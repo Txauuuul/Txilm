@@ -9,9 +9,9 @@
 
 // ── URL del Backend ──────────────────────────────────────
 // Producción (Vercel): pon aquí tu URL de Vercel cuando despliegues
-// Desarrollo local: descomenta la línea de abajo
+// Desarrollo local: descomenta la línea de abajo y comenta la de arriba
 const API_BASE_URL = "https://txilms-api.vercel.app";
-// const API_BASE_URL = "http://192.168.1.100:8000"; // Dev local
+// const API_BASE_URL = "http://172.20.10.2:8000"; // Dev local
 
 /**
  * Busca películas por texto.

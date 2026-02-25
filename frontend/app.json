@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0D0D0D"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.txilms.app"
@@ -27,7 +29,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-image"
+      "expo-asset"
     ]
   }
 }
