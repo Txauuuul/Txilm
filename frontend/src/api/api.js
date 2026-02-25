@@ -1,10 +1,10 @@
 import axios from "axios";
 
 // En desarrollo Vite proxea /api → localhost:8000
-// En producción (Vercel) apunta al backend desplegado
+// En producción (Vercel) apunta al backend Vercel
 const isProd = import.meta.env.PROD;
 const BASE = isProd
-  ? (import.meta.env.VITE_API_URL || "https://txilms-api.vercel.app")
+  ? (import.meta.env.VITE_API_URL || "https://txilm.vercel.app")
   : "/api";
 
 const http = axios.create({
