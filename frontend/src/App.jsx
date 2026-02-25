@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Details from "./pages/Details";
 import Lists from "./pages/Lists";
+import LogoShowcase from "./pages/LogoShowcase";
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/movie/:id" element={<Details />} />
           <Route path="/lists" element={<Lists />} />
+          <Route path="/logos" element={<LogoShowcase />} />
         </Routes>
       </main>
     </div>

@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Heart, Search } from "lucide-react";
+import { Home, Heart } from "lucide-react";
+import Logo from "./Logo";
 
 const NAV_ITEMS = [
   { to: "/", icon: Home, label: "Inicio" },
@@ -15,9 +16,8 @@ export default function Navbar() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-cine-bg/80 backdrop-blur-xl border-b border-cine-border hidden md:block">
         <div className="max-w-6xl mx-auto flex items-center justify-between h-14 px-4">
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-xl font-extrabold text-cine-accent tracking-tight">
-              🎬 Txilms
-            </span>
+            <Logo size="md" className="text-cine-accent" />
+            <span className="text-lg font-extrabold text-white tracking-tight hidden sm:block">Txilms</span>
           </Link>
           <nav className="flex gap-1">
             {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
