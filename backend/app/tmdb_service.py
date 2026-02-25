@@ -182,7 +182,6 @@ async def get_trending(time_window: str = "week", page: int = 1) -> List[Dict[st
             "year": (item.get("release_date") or "")[:4],
             "poster": _poster_url(item.get("poster_path")),
             "backdrop": _backdrop_url(item.get("backdrop_path")),
-            "vote_average": item.get("vote_average", 0),
         })
 
     return results

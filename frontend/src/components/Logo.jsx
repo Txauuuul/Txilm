@@ -7,9 +7,9 @@ export default function Logo({ size = "md", className = "" }) {
 
   return (
     <img
-      src="/logo.png"
+      src="/Txilmslogo.png"
       alt="Txilms"
-      className={`${sizeMap[size]} ${className} object-contain`}
+      className={`${sizeMap[size]} object-contain ${className}`}
     />
   );
 }

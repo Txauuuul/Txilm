@@ -166,7 +166,6 @@ class TrendingItem(BaseModel):
     year: str
     poster: Optional[str]
     backdrop: Optional[str]
-    vote_average: float
 
 
 # ── Endpoints ──────────────────────────────────────────────

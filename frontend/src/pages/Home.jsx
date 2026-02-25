@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, ChevronDown } from "lucide-react";
 import { searchMovies, getTrending } from "../api/api";
 import MovieCard from "../components/MovieCard";
-import Logo from "../components/Logo";
 import useStore from "../store/useStore";
 
 const COUNTRIES = [
@@ -84,11 +83,9 @@ export default function Home() {
       {/* Hero / Header */}
       <section className="relative overflow-hidden px-4 pt-6 pb-4 md:pt-10 md:pb-6">
         <div className="max-w-3xl mx-auto text-center">
-          <div className="flex items-center justify-center mb-3">
-            <Logo size="lg" className="text-cine-accent" />
-          </div>
           <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight">
-            <span className="text-white">Txilms</span>
+            <span className="text-cine-accent">Tx</span>
+            <span className="text-white">ilms</span>
           </h1>
           <p className="text-cine-muted mt-2 text-sm md:text-base">
             Todas las puntuaciones de tus películas en un solo lugar
