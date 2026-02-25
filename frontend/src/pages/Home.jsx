@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, ChevronDown } from "lucide-react";
-import { searchMovies, getTrending } from "../api/api";
+import { Link } from "react-router-dom";
+import { searchMovies, getTrending, getActivity } from "../api/api";
 import MovieCard from "../components/MovieCard";
 import useStore from "../store/useStore";
 
@@ -18,12 +19,13 @@ const COUNTRIES = [
 ];
 
 export default function Home() {
-  const { country, setCountry } = useStore();
+  const { country, setCountry, fetchLists, listsLoaded } = useStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(false);
   const [trendingLoading, setTrendingLoading] = useState(true);
+  const [activity, setActivity] = useState([]);
   const [showCountry, setShowCountry] = useState(false);
   const debounceRef = useRef(null);
   const countryRef = useRef(null);
@@ -38,13 +40,16 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Fetch trending on mount
+  // Fetch trending + activity + lists on mount
   useEffect(() => {
     setTrendingLoading(true);
     getTrending("week", 1)
       .then((data) => setTrending(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setTrendingLoading(false));
+
+    getActivity(15).then(setActivity).catch(() => {});
+    if (!listsLoaded) fetchLists();
   }, []);
 
   // Debounced search
@@ -88,7 +93,7 @@ export default function Home() {
             <span className="text-white">ilms</span>
           </h1>
           <p className="text-cine-muted mt-2 text-sm md:text-base">
-            Todas las puntuaciones de tus películas en un solo lugar
+            La mierdamienta definitiva para cinéfilos exigentes
           </p>
         </div>
       </section>
@@ -179,8 +184,61 @@ export default function Home() {
             )}
           </section>
         ) : (
-          /* Trending section */
-          <section>
+          <>
+            {/* Activity feed */}
+            {activity.length > 0 && (
+              <section className="mb-8">
+                <h2 className="text-lg font-bold mb-4">
+                  👥 Actividad de amigos
+                </h2>
+                <div className="space-y-2">
+                  {activity.slice(0, 10).map((item) => (
+                    <Link
+                      key={item.id}
+                      to={`/movie/${item.tmdb_id}`}
+                      className="flex items-center gap-3 bg-cine-card rounded-xl p-2.5 ring-1 ring-cine-border hover:ring-cine-accent/30 transition"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-cine-border flex items-center justify-center text-xs font-bold uppercase text-cine-accent flex-shrink-0">
+                        {item.username?.charAt(0) || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm line-clamp-1">
+                          <span className="font-semibold text-white">
+                            {item.username}
+                          </span>{" "}
+                          <span className="text-cine-muted">
+                            {item.list_type === "watched"
+                              ? item.rating
+                                ? `puntuó con ${item.rating}/10`
+                                : "marcó como vista"
+                              : item.list_type === "favorite"
+                              ? "añadió a favoritas"
+                              : "añadió a pendientes"}
+                          </span>{" "}
+                          <span className="text-cine-accent">
+                            {item.movie_title}
+                          </span>
+                        </p>
+                        <p className="text-[11px] text-cine-muted">
+                          {new Date(item.created_at).toLocaleDateString("es-ES", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </p>
+                      </div>
+                      {item.rating && (
+                        <span className="text-xs text-cine-gold font-bold flex-shrink-0">
+                          ⭐ {item.rating}
+                        </span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Trending section */}
+            <section>
             <h2 className="text-lg font-bold mb-4">
               🔥 Tendencias de la semana
             </h2>
@@ -211,6 +269,7 @@ export default function Home() {
               </>
             )}
           </section>
+          </>
         )}
       </div>
     </div>

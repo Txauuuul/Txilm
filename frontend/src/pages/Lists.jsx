@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart, Bookmark, Eye, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import useStore from "../store/useStore";
@@ -26,7 +26,14 @@ export default function Lists() {
     removeFavorite,
     removeFromWatchlist,
     removeFromWatched,
+    fetchLists,
+    listsLoaded,
   } = useStore();
+
+  // Fetch lists from API on mount
+  useEffect(() => {
+    fetchLists();
+  }, []);
 
   const lists = { favorites, watchlist, watched };
   const removeFns = {
@@ -138,7 +145,12 @@ function ListItem({ movie, onRemove }) {
           {movie.title}
         </p>
         <p className="text-xs text-cine-muted">{movie.year || "—"}</p>
-        {movie.vote_average && (
+        {movie.rating && (
+          <span className="text-xs text-cine-gold">
+            ⭐ {movie.rating}/10
+          </span>
+        )}
+        {!movie.rating && movie.vote_average && (
           <span className="text-xs text-cine-gold">
             ⭐ {movie.vote_average}
           </span>

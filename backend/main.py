@@ -18,12 +18,20 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 from app.config import TMDB_API_KEY, OMDB_API_KEY, SUPABASE_URL
+from app.auth import register_user, login_user, require_auth, require_admin
+from app.social import (
+    get_user_lists, add_to_list, remove_from_list, update_rating,
+    get_movie_ratings, share_movie, get_notifications, get_unread_count,
+    mark_notification_read, mark_all_notifications_read, get_profile,
+    get_all_profiles, get_friend_activity, generate_invite_codes,
+    get_available_codes, get_all_codes, notify_all_except,
+)
 from app.tmdb_service import (
     search_movies,
     get_movie_detail,
@@ -365,3 +373,229 @@ async def health_check():
         "omdb_configured": bool(OMDB_API_KEY),
         "supabase_configured": bool(SUPABASE_URL),
     }
+
+
+# ══════════════════════════════════════════════════════════
+# SISTEMA SOCIAL - Autenticación, Listas, Envíos, Notif.
+# ══════════════════════════════════════════════════════════
+
+# ── Modelos de petición ──
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    invite_code: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class AddToListRequest(BaseModel):
+    tmdb_id: int
+    list_type: str
+    movie_title: str
+    movie_poster: Optional[str] = None
+    movie_year: Optional[str] = None
+    rating: Optional[int] = None
+
+class UpdateRatingRequest(BaseModel):
+    rating: int
+
+class ShareMovieRequest(BaseModel):
+    to_user_id: str
+    tmdb_id: int
+    movie_title: str
+    movie_poster: Optional[str] = None
+    message: Optional[str] = None
+
+class GenerateCodesRequest(BaseModel):
+    count: int = 5
+
+
+# ── Auth Endpoints ──
+
+@app.post("/auth/register", tags=["Auth"])
+async def auth_register(body: RegisterRequest):
+    """Registrar nuevo usuario con código de invitación."""
+    return await register_user(body.username, body.password, body.invite_code)
+
+
+@app.post("/auth/login", tags=["Auth"])
+async def auth_login(body: LoginRequest):
+    """Login con usuario y contraseña."""
+    return await login_user(body.username, body.password)
+
+
+@app.get("/auth/me", tags=["Auth"])
+async def auth_me(request: Request):
+    """Obtener perfil del usuario actual."""
+    user = await require_auth(request)
+    return user
+
+
+# ── User Lists Endpoints ──
+
+@app.get("/lists", tags=["Listas"])
+async def get_my_lists(request: Request, list_type: Optional[str] = None):
+    """Obtener mis listas de películas."""
+    user = await require_auth(request)
+    return await get_user_lists(user["id"], list_type)
+
+
+@app.get("/lists/user/{user_id}", tags=["Listas"])
+async def get_user_lists_endpoint(request: Request, user_id: str, list_type: Optional[str] = None):
+    """Obtener listas de un amigo."""
+    await require_auth(request)
+    return await get_user_lists(user_id, list_type)
+
+
+@app.post("/lists", tags=["Listas"])
+async def add_to_list_endpoint(request: Request, body: AddToListRequest):
+    """Añadir película a una lista."""
+    user = await require_auth(request)
+    result = await add_to_list(
+        user_id=user["id"],
+        tmdb_id=body.tmdb_id,
+        list_type=body.list_type,
+        movie_title=body.movie_title,
+        movie_poster=body.movie_poster,
+        movie_year=body.movie_year,
+        rating=body.rating,
+    )
+
+    # Notificar a todos si el usuario puntuó una película
+    if body.list_type == "watched" and body.rating:
+        await notify_all_except(
+            exclude_user_id=user["id"],
+            notif_type="movie_rated",
+            from_user_id=user["id"],
+            data={
+                "from_username": user.get("username", "???"),
+                "tmdb_id": body.tmdb_id,
+                "movie_title": body.movie_title,
+                "movie_poster": body.movie_poster,
+                "rating": body.rating,
+            },
+        )
+
+    return result
+
+
+@app.delete("/lists/{tmdb_id}/{list_type}", tags=["Listas"])
+async def remove_from_list_endpoint(request: Request, tmdb_id: int, list_type: str):
+    """Eliminar película de una lista."""
+    user = await require_auth(request)
+    success = await remove_from_list(user["id"], tmdb_id, list_type)
+    if not success:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return {"ok": True}
+
+
+@app.put("/lists/{tmdb_id}/rating", tags=["Listas"])
+async def update_rating_endpoint(request: Request, tmdb_id: int, body: UpdateRatingRequest):
+    """Actualizar puntuación de una película vista."""
+    user = await require_auth(request)
+    result = await update_rating(user["id"], tmdb_id, body.rating)
+    return result
+
+
+@app.get("/movie/{tmdb_id}/ratings", tags=["Listas"])
+async def get_movie_ratings_endpoint(tmdb_id: int):
+    """Obtener puntuaciones de amigos para una película."""
+    return await get_movie_ratings(tmdb_id)
+
+
+# ── Shares Endpoints ──
+
+@app.post("/shares", tags=["Envíos"])
+async def share_movie_endpoint(request: Request, body: ShareMovieRequest):
+    """Enviar película a un amigo."""
+    user = await require_auth(request)
+    result = await share_movie(
+        from_user_id=user["id"],
+        to_user_id=body.to_user_id,
+        tmdb_id=body.tmdb_id,
+        movie_title=body.movie_title,
+        movie_poster=body.movie_poster,
+        message=body.message,
+    )
+    return result
+
+
+# ── Notifications Endpoints ──
+
+@app.get("/notifications", tags=["Notificaciones"])
+async def get_notifications_endpoint(request: Request, unread_only: bool = False):
+    """Obtener mis notificaciones."""
+    user = await require_auth(request)
+    return await get_notifications(user["id"], unread_only)
+
+
+@app.get("/notifications/count", tags=["Notificaciones"])
+async def get_notification_count(request: Request):
+    """Obtener cantidad de notificaciones no leídas."""
+    user = await require_auth(request)
+    count = await get_unread_count(user["id"])
+    return {"count": count}
+
+
+@app.put("/notifications/{notif_id}/read", tags=["Notificaciones"])
+async def mark_read_endpoint(request: Request, notif_id: int):
+    """Marcar una notificación como leída."""
+    user = await require_auth(request)
+    await mark_notification_read(notif_id, user["id"])
+    return {"ok": True}
+
+
+@app.put("/notifications/read-all", tags=["Notificaciones"])
+async def mark_all_read_endpoint(request: Request):
+    """Marcar todas las notificaciones como leídas."""
+    user = await require_auth(request)
+    await mark_all_notifications_read(user["id"])
+    return {"ok": True}
+
+
+# ── Profiles Endpoints ──
+
+@app.get("/profiles", tags=["Perfiles"])
+async def get_profiles_endpoint(request: Request):
+    """Obtener todos los perfiles de usuario."""
+    await require_auth(request)
+    return await get_all_profiles()
+
+
+@app.get("/profiles/{user_id}", tags=["Perfiles"])
+async def get_profile_endpoint(request: Request, user_id: str):
+    """Obtener perfil de un usuario específico."""
+    await require_auth(request)
+    profile = await get_profile(user_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    return profile
+
+
+# ── Activity Endpoint ──
+
+@app.get("/activity", tags=["Social"])
+async def get_activity_endpoint(request: Request, limit: int = Query(20, ge=1, le=50)):
+    """Obtener actividad reciente de amigos."""
+    user = await require_auth(request)
+    return await get_friend_activity(user["id"], limit)
+
+
+# ── Admin: Invite Codes ──
+
+@app.post("/admin/invite-codes", tags=["Admin"])
+async def generate_codes_endpoint(request: Request, body: GenerateCodesRequest):
+    """Generar nuevos códigos de invitación (solo admin)."""
+    user = await require_admin(request)
+    codes = await generate_invite_codes(body.count, user["id"])
+    return {"codes": codes}
+
+
+@app.get("/admin/invite-codes", tags=["Admin"])
+async def get_codes_endpoint(request: Request):
+    """Ver todos los códigos de invitación (solo admin)."""
+    await require_admin(request)
+    return await get_all_codes()
+

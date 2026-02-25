@@ -9,10 +9,14 @@ import {
   Clock,
   Calendar,
   Film,
+  Send,
+  Star,
 } from "lucide-react";
-import { getMovieDetail } from "../api/api";
+import { getMovieDetail, getMovieRatings } from "../api/api";
 import useColorExtractor from "../hooks/useColorExtractor";
 import ScoreCard from "../components/ScoreCard";
+import ShareModal from "../components/ShareModal";
+import RatingModal from "../components/RatingModal";
 import useStore from "../store/useStore";
 
 const TMDB_IMG = "https://image.tmdb.org/t/p";
@@ -29,6 +33,9 @@ export default function Details() {
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showShare, setShowShare] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [friendRatings, setFriendRatings] = useState([]);
 
   const {
     country,
@@ -37,7 +44,10 @@ export default function Details() {
     isInWatchlist,
     toggleWatchlist,
     isWatched,
-    toggleWatched,
+    addToWatched,
+    removeFromWatched,
+    fetchLists,
+    listsLoaded,
   } = useStore();
 
   const posterUrl = imgUrl(movie?.poster, "w500");
@@ -46,12 +56,19 @@ export default function Details() {
   const dominantColor = useColorExtractor(posterUrl);
 
   useEffect(() => {
+    if (!listsLoaded) fetchLists();
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     setError(null);
     getMovieDetail(id, country)
       .then(setMovie)
       .catch(() => setError("No se pudo cargar la película"))
       .finally(() => setLoading(false));
+
+    // Load friend ratings
+    getMovieRatings(id).then(setFriendRatings).catch(() => {});
   }, [id, country]);
 
   /* ───── loading skeleton ───── */
@@ -213,10 +230,23 @@ export default function Details() {
               />
               <ActionBtn
                 active={isWatched(movie.tmdb_id)}
-                onClick={() => toggleWatched(miniMovie)}
+                onClick={() => {
+                  if (isWatched(movie.tmdb_id)) {
+                    removeFromWatched(movie.tmdb_id);
+                  } else {
+                    setShowRating(true);
+                  }
+                }}
                 Icon={Eye}
                 label="Vista"
                 activeColor="text-cine-green"
+              />
+              <ActionBtn
+                active={false}
+                onClick={() => setShowShare(true)}
+                Icon={Send}
+                label="Enviar"
+                activeColor="text-cine-blue"
               />
             </div>
           </div>
@@ -347,7 +377,48 @@ export default function Details() {
             </div>
           </section>
         )}
+
+        {/* ───── friend ratings ───── */}
+        {friendRatings.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3 flex items-center gap-2">
+              <Star className="w-4 h-4 text-cine-gold" /> Puntuaciones de amigos
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {friendRatings.map((r, i) => (
+                <Link
+                  key={i}
+                  to={`/profile/${r.user_id}`}
+                  className="flex items-center gap-2 bg-cine-card rounded-xl px-3 py-2 ring-1 ring-cine-border hover:ring-cine-accent/30 transition"
+                >
+                  <div className="w-7 h-7 rounded-full bg-cine-border flex items-center justify-center text-[10px] font-bold uppercase text-cine-accent">
+                    {r.username?.charAt(0) || "?"}
+                  </div>
+                  <span className="text-sm font-medium">{r.username}</span>
+                  <span className="text-cine-gold text-sm font-bold">
+                    {r.rating}/10
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
+
+      {/* ───── Modals ───── */}
+      {showShare && movie && (
+        <ShareModal movie={miniMovie} onClose={() => setShowShare(false)} />
+      )}
+      {showRating && movie && (
+        <RatingModal
+          movie={miniMovie}
+          onClose={() => setShowRating(false)}
+          onConfirm={(rating) => {
+            addToWatched(miniMovie, rating);
+            setShowRating(false);
+          }}
+        />
+      )}
     </div>
   );
 }
