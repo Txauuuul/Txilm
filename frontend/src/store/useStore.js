@@ -1,118 +1,77 @@
-/**
- * Txilms - Store con Zustand
- * ===========================
- * Gestión de estado global:
- *   - País seleccionado
- *   - Listas de usuario (Favoritos, Pendientes, Vistas)
- *
- * Persistencia con AsyncStorage.
- */
-
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { persist } from "zustand/middleware";
 
-/**
- * Lista de países soportados para filtrar streaming.
- */
-export const COUNTRIES = [
-  { code: "ES", name: "España", flag: "🇪🇸" },
-  { code: "MX", name: "México", flag: "🇲🇽" },
-  { code: "AR", name: "Argentina", flag: "🇦🇷" },
-  { code: "CO", name: "Colombia", flag: "🇨🇴" },
-  { code: "CL", name: "Chile", flag: "🇨🇱" },
-  { code: "PE", name: "Perú", flag: "🇵🇪" },
-  { code: "US", name: "Estados Unidos", flag: "🇺🇸" },
-  { code: "GB", name: "Reino Unido", flag: "🇬🇧" },
-  { code: "FR", name: "Francia", flag: "🇫🇷" },
-  { code: "DE", name: "Alemania", flag: "🇩🇪" },
-  { code: "IT", name: "Italia", flag: "🇮🇹" },
-  { code: "BR", name: "Brasil", flag: "🇧🇷" },
-  { code: "PT", name: "Portugal", flag: "🇵🇹" },
-];
-
-/**
- * Store principal de la aplicación.
- */
 const useStore = create(
   persist(
     (set, get) => ({
-      // ── Estado ──────────────────────────────
-      selectedCountry: "ES",
-      favorites: [], // Array de objetos de película simplificados
-      watchlist: [], // Pendientes
-      watched: [], // Vistas
+      // ── Listas ──
+      favorites: [],
+      watchlist: [],
+      watched: [],
 
-      // ── Acciones: País ──────────────────────
-      setCountry: (code) => set({ selectedCountry: code }),
+      // ── País seleccionado ──
+      country: "ES",
+      setCountry: (c) => set({ country: c }),
 
-      // ── Acciones: Favoritos ─────────────────
-      addToFavorites: (movie) => {
-        const { favorites } = get();
-        if (!favorites.find((m) => m.tmdb_id === movie.tmdb_id)) {
-          set({ favorites: [movie, ...favorites] });
-        }
-      },
-      removeFromFavorites: (tmdbId) => {
-        set({ favorites: get().favorites.filter((m) => m.tmdb_id !== tmdbId) });
-      },
-      isFavorite: (tmdbId) => {
-        return get().favorites.some((m) => m.tmdb_id === tmdbId);
-      },
-
-      // ── Acciones: Pendientes ────────────────
-      addToWatchlist: (movie) => {
-        const { watchlist } = get();
-        if (!watchlist.find((m) => m.tmdb_id === movie.tmdb_id)) {
-          set({ watchlist: [movie, ...watchlist] });
-        }
-      },
-      removeFromWatchlist: (tmdbId) => {
-        set({
-          watchlist: get().watchlist.filter((m) => m.tmdb_id !== tmdbId),
-        });
-      },
-      isInWatchlist: (tmdbId) => {
-        return get().watchlist.some((m) => m.tmdb_id === tmdbId);
+      // ── Favoritos ──
+      addFavorite: (movie) =>
+        set((s) => ({
+          favorites: s.favorites.some((m) => m.tmdb_id === movie.tmdb_id)
+            ? s.favorites
+            : [movie, ...s.favorites],
+        })),
+      removeFavorite: (id) =>
+        set((s) => ({
+          favorites: s.favorites.filter((m) => m.tmdb_id !== id),
+        })),
+      isFavorite: (id) => get().favorites.some((m) => m.tmdb_id === id),
+      toggleFavorite: (movie) => {
+        const s = get();
+        s.isFavorite(movie.tmdb_id)
+          ? s.removeFavorite(movie.tmdb_id)
+          : s.addFavorite(movie);
       },
 
-      // ── Acciones: Vistas ────────────────────
-      addToWatched: (movie) => {
-        const { watched } = get();
-        if (!watched.find((m) => m.tmdb_id === movie.tmdb_id)) {
-          set({ watched: [movie, ...watched] });
-        }
-      },
-      removeFromWatched: (tmdbId) => {
-        set({ watched: get().watched.filter((m) => m.tmdb_id !== tmdbId) });
-      },
-      isWatched: (tmdbId) => {
-        return get().watched.some((m) => m.tmdb_id === tmdbId);
+      // ── Pendientes ──
+      addToWatchlist: (movie) =>
+        set((s) => ({
+          watchlist: s.watchlist.some((m) => m.tmdb_id === movie.tmdb_id)
+            ? s.watchlist
+            : [movie, ...s.watchlist],
+        })),
+      removeFromWatchlist: (id) =>
+        set((s) => ({
+          watchlist: s.watchlist.filter((m) => m.tmdb_id !== id),
+        })),
+      isInWatchlist: (id) => get().watchlist.some((m) => m.tmdb_id === id),
+      toggleWatchlist: (movie) => {
+        const s = get();
+        s.isInWatchlist(movie.tmdb_id)
+          ? s.removeFromWatchlist(movie.tmdb_id)
+          : s.addToWatchlist(movie);
       },
 
-      // ── Utilidades ──────────────────────────
-      /**
-       * Genera un objeto simplificado de película para guardar en las listas.
-       * Evita almacenar datos innecesarios en AsyncStorage.
-       */
-      simplifyMovie: (movie) => ({
-        tmdb_id: movie.tmdb_id,
-        title: movie.title,
-        year: movie.year,
-        poster: movie.poster,
-        vote_average: movie.vote_average || movie.vote_average_tmdb || 0,
-      }),
+      // ── Vistas ──
+      addToWatched: (movie) =>
+        set((s) => ({
+          watched: s.watched.some((m) => m.tmdb_id === movie.tmdb_id)
+            ? s.watched
+            : [movie, ...s.watched],
+        })),
+      removeFromWatched: (id) =>
+        set((s) => ({
+          watched: s.watched.filter((m) => m.tmdb_id !== id),
+        })),
+      isWatched: (id) => get().watched.some((m) => m.tmdb_id === id),
+      toggleWatched: (movie) => {
+        const s = get();
+        s.isWatched(movie.tmdb_id)
+          ? s.removeFromWatched(movie.tmdb_id)
+          : s.addToWatched(movie);
+      },
     }),
     {
       name: "txilms-storage",
-      storage: createJSONStorage(() => AsyncStorage),
-      // Solo persistir estos campos
-      partialize: (state) => ({
-        selectedCountry: state.selectedCountry,
-        favorites: state.favorites,
-        watchlist: state.watchlist,
-        watched: state.watched,
-      }),
     }
   )
 );
