@@ -99,7 +99,7 @@ export default function Home() {
       </section>
 
       {/* Search bar + country */}
-      <section className="sticky top-0 md:top-16 z-30 bg-cine-bg/80 backdrop-blur-lg border-b border-cine-border px-4 py-3">
+      <section className="sticky sticky-safe z-30 bg-cine-bg/80 backdrop-blur-lg border-b border-cine-border px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center gap-2">
           {/* Search input */}
           <div className="relative flex-1">

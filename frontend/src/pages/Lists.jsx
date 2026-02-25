@@ -58,7 +58,7 @@ export default function Lists() {
       </section>
 
       {/* tabs */}
-      <section className="sticky top-0 md:top-16 z-30 bg-cine-bg/80 backdrop-blur-lg border-b border-cine-border px-4 py-2">
+      <section className="sticky sticky-safe z-30 bg-cine-bg/80 backdrop-blur-lg border-b border-cine-border px-4 py-2">
         <div className="max-w-4xl mx-auto flex gap-1">
           {TABS.map(({ key, label, Icon, color }) => {
             const active = activeTab === key;

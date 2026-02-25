@@ -30,8 +30,8 @@ export default function App() {
   return (
     <div className="bg-cine-bg text-white min-h-screen">
       {isAuthenticated && <Navbar />}
-      {/* main area: add top padding for fixed desktop nav */}
-      <main className={isAuthenticated ? "md:pt-16" : ""}>
+      {/* main area: safe-area top on mobile, fixed-nav offset on desktop */}
+      <main className={isAuthenticated ? "safe-top" : ""}>
         <Routes>
           {/* Public */}
           <Route path="/login" element={<Login />} />
