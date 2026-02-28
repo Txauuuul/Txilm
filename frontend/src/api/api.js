@@ -22,17 +22,73 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-// ── Interceptor: logout automático en 401 ──
+// ── Interceptor: logout automático en 401 con refresh automático ──
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function onRefreshed(newToken) {
+  refreshSubscribers.forEach((cb) => cb(newToken));
+  refreshSubscribers = [];
+}
+
+function subscribeTokenRefresh(cb) {
+  refreshSubscribers.push(cb);
+}
+
 http.interceptors.response.use(
   (res) => res,
-  (err) => {
+  async (err) => {
+    const originalRequest = err.config;
+
+    // Skip refresh logic for auth endpoints
     if (
       err.response?.status === 401 &&
-      !err.config?.url?.includes("/auth/")
+      !originalRequest?.url?.includes("/auth/") &&
+      !originalRequest._retry
     ) {
-      useAuthStore.getState().logout();
-      window.location.href = "/login";
+      const refreshToken = useAuthStore.getState().refreshToken;
+
+      if (!refreshToken) {
+        useAuthStore.getState().logout();
+        window.location.href = "/login";
+        return Promise.reject(err);
+      }
+
+      if (isRefreshing) {
+        // Wait for the ongoing refresh
+        return new Promise((resolve) => {
+          subscribeTokenRefresh((newToken) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            resolve(http(originalRequest));
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axios.post(`${BASE}/auth/refresh`, {
+          refresh_token: refreshToken,
+        });
+
+        const { access_token, refresh_token: newRefresh, user } = data;
+        useAuthStore.getState().setAuth(user, access_token, newRefresh);
+
+        // Retry original request and all queued requests
+        onRefreshed(access_token);
+        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        return http(originalRequest);
+      } catch (refreshError) {
+        // Refresh failed → full logout
+        useAuthStore.getState().logout();
+        window.location.href = "/login";
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
     }
+
     return Promise.reject(err);
   }
 );
@@ -123,6 +179,12 @@ export async function login(username, password) {
 
 export async function getMe() {
   const { data } = await http.get("/auth/me");
+  return data;
+}
+
+/** Refrescar sesión con refresh_token */
+export async function refreshToken(rt) {
+  const { data } = await http.post("/auth/refresh", { refresh_token: rt });
   return data;
 }
 

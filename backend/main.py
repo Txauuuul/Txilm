@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 from app.config import TMDB_API_KEY, OMDB_API_KEY, SUPABASE_URL
-from app.auth import register_user, login_user, require_auth, require_admin
+from app.auth import register_user, login_user, refresh_session, require_auth, require_admin
 from app.social import (
     get_user_lists, add_to_list, remove_from_list, update_rating,
     get_movie_ratings, share_movie, get_notifications, get_unread_count,
@@ -496,6 +496,16 @@ async def auth_me(request: Request):
     """Obtener perfil del usuario actual."""
     user = await require_auth(request)
     return user
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@app.post("/auth/refresh", tags=["Auth"])
+async def auth_refresh(body: RefreshRequest):
+    """Renovar tokens usando refresh_token. Mantiene la sesión activa."""
+    return await refresh_session(body.refresh_token)
 
 
 # ── User Lists Endpoints ──

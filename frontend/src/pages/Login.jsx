@@ -24,7 +24,7 @@ export default function Login() {
     setLoading(true);
     try {
       const data = await apiLogin(username.trim(), password);
-      setAuth(data.user, data.access_token);
+      setAuth(data.user, data.access_token, data.refresh_token);
       navigate("/", { replace: true });
     } catch (err) {
       setError(

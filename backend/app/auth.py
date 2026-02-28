@@ -221,6 +221,38 @@ async def get_current_user(request: Request) -> Optional[Dict[str, Any]]:
         return profiles[0] if profiles else None
 
 
+async def refresh_session(refresh_token: str) -> Dict[str, Any]:
+    """Renueva la sesión usando el refresh_token. Devuelve nuevos tokens + perfil."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_AUTH_URL}/token?grant_type=refresh_token",
+            headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+            json={"refresh_token": refresh_token},
+        )
+
+        if resp.status_code != 200:
+            logger.warning(f"Refresh token inválido o expirado: {resp.status_code}")
+            raise HTTPException(status_code=401, detail="Sesión expirada, inicia sesión de nuevo")
+
+        auth_data = resp.json()
+        user_id = auth_data["user"]["id"]
+
+    # Obtener perfil
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/profiles?id=eq.{user_id}&select=*",
+            headers=_admin_headers(),
+        )
+        profiles = resp.json()
+        profile = profiles[0] if profiles else None
+
+    return {
+        "access_token": auth_data["access_token"],
+        "refresh_token": auth_data.get("refresh_token", refresh_token),
+        "user": profile,
+    }
+
+
 async def require_auth(request: Request) -> Dict[str, Any]:
     """Requiere autenticación. Lanza 401 si no está autenticado."""
     user = await get_current_user(request)

@@ -11,7 +11,7 @@ import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import Social from "./pages/Social";
 import useAuthStore from "./store/useAuthStore";
-import { getMe } from "./api/api";
+import { getMe, refreshToken as apiRefresh } from "./api/api";
 
 export default function App() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -19,12 +19,25 @@ export default function App() {
   const logout = useAuthStore((s) => s.logout);
   const token = useAuthStore((s) => s.token);
 
-  // Verify token on mount
+  // Verify token on mount — try refresh if expired
   useEffect(() => {
     if (!token) return;
     getMe()
       .then((user) => setAuth(user, token))
-      .catch(() => logout());
+      .catch(async () => {
+        // Token expired — try to refresh
+        const rt = useAuthStore.getState().refreshToken;
+        if (rt) {
+          try {
+            const data = await apiRefresh(rt);
+            setAuth(data.user, data.access_token, data.refresh_token);
+          } catch {
+            logout();
+          }
+        } else {
+          logout();
+        }
+      });
   }, []);
 
   return (

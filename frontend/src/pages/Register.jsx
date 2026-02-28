@@ -40,7 +40,7 @@ export default function Register() {
         password,
         inviteCode.trim().toUpperCase()
       );
-      setAuth(data.user, data.access_token);
+      setAuth(data.user, data.access_token, data.refresh_token);
       navigate("/", { replace: true });
     } catch (err) {
       setError(

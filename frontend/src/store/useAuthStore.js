@@ -6,18 +6,25 @@ const useAuthStore = create(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
 
-      setAuth: (user, token) =>
-        set({ user, token, isAuthenticated: true }),
+      setAuth: (user, token, refreshToken) =>
+        set({
+          user,
+          token,
+          refreshToken: refreshToken || get().refreshToken,
+          isAuthenticated: true,
+        }),
 
       updateUser: (patch) =>
         set((s) => ({ user: { ...s.user, ...patch } })),
 
       logout: () =>
-        set({ user: null, token: null, isAuthenticated: false }),
+        set({ user: null, token: null, refreshToken: null, isAuthenticated: false }),
 
       getToken: () => get().token,
+      getRefreshToken: () => get().refreshToken,
     }),
     {
       name: "txilms-auth",
