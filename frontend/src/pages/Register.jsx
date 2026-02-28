@@ -57,7 +57,7 @@ export default function Register() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-3">
-            <Logo size="lg" className="!w-24 !h-24" />
+            <Logo size="xl" />
           </div>
           <p className="text-cine-muted text-sm mt-1">Crear cuenta</p>
         </div>
