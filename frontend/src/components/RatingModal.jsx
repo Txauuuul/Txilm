@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { X, Star } from "lucide-react";
 
-export default function RatingModal({ movie, onConfirm, onClose }) {
-  const [rating, setRating] = useState(0);
+export default function RatingModal({ movie, onConfirm, onClose, initialRating = 0 }) {
+  const [rating, setRating] = useState(initialRating || 0);
   const [hover, setHover] = useState(0);
 
   const handleConfirm = () => {

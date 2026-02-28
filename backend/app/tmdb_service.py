@@ -81,7 +81,7 @@ async def get_movie_detail(tmdb_id: int) -> Dict[str, Any]:
     # Petición principal + external_ids en una sola llamada
     resp = await _client.get(
         f"{TMDB_BASE_URL}/movie/{tmdb_id}",
-        params=_params(append_to_response="external_ids,credits"),
+        params=_params(append_to_response="external_ids,credits,videos"),
     )
     resp.raise_for_status()
     data = resp.json()
@@ -108,6 +108,19 @@ async def get_movie_detail(tmdb_id: int) -> Dict[str, Any]:
 
     external = data.get("external_ids", {})
 
+    # Extraer videos/tráilers (preferir YouTube, preferir tráiler oficial en español, luego en inglés)
+    videos = []
+    for v in data.get("videos", {}).get("results", []):
+        if v.get("site") == "YouTube" and v.get("type") in ("Trailer", "Teaser"):
+            videos.append({
+                "key": v["key"],
+                "name": v.get("name", ""),
+                "type": v.get("type", ""),
+                "lang": v.get("iso_639_1", ""),
+            })
+    # Sort: Spanish trailers first, then trailers before teasers
+    videos.sort(key=lambda v: (v["lang"] != "es", v["type"] != "Trailer"))
+
     return {
         "tmdb_id": data["id"],
         "imdb_id": external.get("imdb_id"),
@@ -124,6 +137,8 @@ async def get_movie_detail(tmdb_id: int) -> Dict[str, Any]:
         "backdrop": _backdrop_url(data.get("backdrop_path")),
         "vote_average_tmdb": round(data.get("vote_average", 0), 1),
         "vote_count_tmdb": data.get("vote_count", 0),
+        "videos": videos[:5],  # Top 5 trailers/teasers
+        "genre_ids": [g["id"] for g in data.get("genres", [])],
     }
 
 

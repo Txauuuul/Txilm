@@ -24,13 +24,17 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 from app.config import TMDB_API_KEY, OMDB_API_KEY, SUPABASE_URL
-from app.auth import register_user, login_user, refresh_session, require_auth, require_admin
+from app.auth import register_user, login_user, refresh_session, require_auth, require_admin, change_password
 from app.social import (
     get_user_lists, add_to_list, remove_from_list, update_rating,
     get_movie_ratings, share_movie, get_notifications, get_unread_count,
     mark_notification_read, mark_all_notifications_read, get_profile,
     get_all_profiles, get_friend_activity, generate_invite_codes,
     get_available_codes, get_all_codes, notify_all_except,
+    follow_user, unfollow_user, get_following, get_followers,
+    get_follow_counts, get_custom_lists, create_custom_list,
+    delete_custom_list, get_custom_list_items, add_to_custom_list,
+    remove_from_custom_list, get_user_stats,
 )
 from app.tmdb_service import (
     search_movies,
@@ -324,6 +328,7 @@ async def movie_detail(
         "runtime": tmdb_data.get("runtime"),
         "overview": tmdb_data["overview"],
         "genres": tmdb_data["genres"],
+        "genre_ids": tmdb_data.get("genre_ids", []),
         "director": tmdb_data["director"],
         "cast": tmdb_data["cast"],
         "poster": tmdb_data["poster"],
@@ -331,6 +336,7 @@ async def movie_detail(
         "rated": omdb_data.get("rated"),
         "scores": scores,
         "watch_providers": providers_data,
+        "videos": tmdb_data.get("videos", []),
     }
 
     # ── Guardar en caché el objeto completo ──
@@ -476,6 +482,20 @@ class ShareMovieRequest(BaseModel):
 class GenerateCodesRequest(BaseModel):
     count: int = 5
 
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+class CreateCustomListRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class AddToCustomListRequest(BaseModel):
+    tmdb_id: int
+    movie_title: str
+    movie_poster: Optional[str] = None
+    movie_year: Optional[str] = None
+
 
 # ── Auth Endpoints ──
 
@@ -506,6 +526,16 @@ class RefreshRequest(BaseModel):
 async def auth_refresh(body: RefreshRequest):
     """Renovar tokens usando refresh_token. Mantiene la sesión activa."""
     return await refresh_session(body.refresh_token)
+
+
+@app.post("/auth/change-password", tags=["Auth"])
+async def auth_change_password(request: Request, body: ChangePasswordRequest):
+    """Cambiar contraseña del usuario actual."""
+    user = await require_auth(request)
+    result = await change_password(user["id"], user["username"], body.old_password, body.new_password)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # ── User Lists Endpoints ──
@@ -673,4 +703,125 @@ async def get_codes_endpoint(request: Request):
     """Ver todos los códigos de invitación (solo admin)."""
     await require_admin(request)
     return await get_all_codes()
+
+
+# ══════════════════════════════════════════════════════════
+# SISTEMA DE SEGUIMIENTO (FOLLOWS)
+# ══════════════════════════════════════════════════════════
+
+@app.post("/follows/{user_id}", tags=["Follows"])
+async def follow_endpoint(request: Request, user_id: str):
+    """Seguir a un usuario."""
+    me = await require_auth(request)
+    result = await follow_user(me["id"], user_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+
+@app.delete("/follows/{user_id}", tags=["Follows"])
+async def unfollow_endpoint(request: Request, user_id: str):
+    """Dejar de seguir a un usuario."""
+    me = await require_auth(request)
+    success = await unfollow_user(me["id"], user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return {"ok": True}
+
+
+@app.get("/follows/following", tags=["Follows"])
+async def get_following_endpoint(request: Request):
+    """Obtener lista de usuarios que sigo."""
+    me = await require_auth(request)
+    return await get_following(me["id"])
+
+
+@app.get("/follows/followers", tags=["Follows"])
+async def get_followers_endpoint(request: Request):
+    """Obtener lista de mis seguidores."""
+    me = await require_auth(request)
+    return await get_followers(me["id"])
+
+
+@app.get("/follows/counts/{user_id}", tags=["Follows"])
+async def get_follow_counts_endpoint(request: Request, user_id: str):
+    """Obtener contadores de seguidores/seguidos de un usuario."""
+    await require_auth(request)
+    return await get_follow_counts(user_id)
+
+
+# ══════════════════════════════════════════════════════════
+# LISTAS PERSONALIZADAS
+# ══════════════════════════════════════════════════════════
+
+@app.get("/custom-lists", tags=["Listas Personalizadas"])
+async def get_custom_lists_endpoint(request: Request):
+    """Obtener mis listas personalizadas."""
+    user = await require_auth(request)
+    return await get_custom_lists(user["id"])
+
+
+@app.post("/custom-lists", tags=["Listas Personalizadas"])
+async def create_custom_list_endpoint(request: Request, body: CreateCustomListRequest):
+    """Crear una nueva lista personalizada."""
+    user = await require_auth(request)
+    return await create_custom_list(user["id"], body.name, body.description)
+
+
+@app.delete("/custom-lists/{list_id}", tags=["Listas Personalizadas"])
+async def delete_custom_list_endpoint(request: Request, list_id: int):
+    """Eliminar una lista personalizada."""
+    user = await require_auth(request)
+    success = await delete_custom_list(list_id, user["id"])
+    if not success:
+        raise HTTPException(status_code=404, detail="Lista no encontrada")
+    return {"ok": True}
+
+
+@app.get("/custom-lists/{list_id}/items", tags=["Listas Personalizadas"])
+async def get_custom_list_items_endpoint(request: Request, list_id: int):
+    """Obtener items de una lista personalizada."""
+    await require_auth(request)
+    return await get_custom_list_items(list_id)
+
+
+@app.post("/custom-lists/{list_id}/items", tags=["Listas Personalizadas"])
+async def add_to_custom_list_endpoint(request: Request, list_id: int, body: AddToCustomListRequest):
+    """Añadir película a una lista personalizada."""
+    await require_auth(request)
+    return await add_to_custom_list(
+        list_id=list_id,
+        tmdb_id=body.tmdb_id,
+        movie_title=body.movie_title,
+        movie_poster=body.movie_poster,
+        movie_year=body.movie_year,
+    )
+
+
+@app.delete("/custom-lists/{list_id}/items/{tmdb_id}", tags=["Listas Personalizadas"])
+async def remove_from_custom_list_endpoint(request: Request, list_id: int, tmdb_id: int):
+    """Eliminar película de una lista personalizada."""
+    await require_auth(request)
+    success = await remove_from_custom_list(list_id, tmdb_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════
+# ESTADÍSTICAS DE PERFIL
+# ══════════════════════════════════════════════════════════
+
+@app.get("/stats/{user_id}", tags=["Estadísticas"])
+async def get_stats_endpoint(request: Request, user_id: str):
+    """Obtener estadísticas de un usuario."""
+    await require_auth(request)
+    return await get_user_stats(user_id)
+
+
+@app.get("/stats", tags=["Estadísticas"])
+async def get_my_stats_endpoint(request: Request):
+    """Obtener mis estadísticas."""
+    user = await require_auth(request)
+    return await get_user_stats(user["id"])
 

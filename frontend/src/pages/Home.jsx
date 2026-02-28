@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, ChevronDown } from "lucide-react";
+import { Search, X, ChevronDown, Clock, SlidersHorizontal, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   searchMovies,
@@ -25,6 +25,54 @@ const COUNTRIES = [
   { code: "JP", label: "Japón" },
 ];
 
+const GENRES = [
+  { id: "", label: "Todos" },
+  { id: "28", label: "Acción" },
+  { id: "16", label: "Animación" },
+  { id: "12", label: "Aventura" },
+  { id: "35", label: "Comedia" },
+  { id: "80", label: "Crimen" },
+  { id: "99", label: "Documental" },
+  { id: "18", label: "Drama" },
+  { id: "14", label: "Fantasía" },
+  { id: "27", label: "Terror" },
+  { id: "10749", label: "Romance" },
+  { id: "878", label: "Sci-Fi" },
+  { id: "53", label: "Suspense" },
+];
+
+const DECADES = [
+  { label: "Cualquier año", from: "", to: "" },
+  { label: "2020s", from: "2020", to: "2029" },
+  { label: "2010s", from: "2010", to: "2019" },
+  { label: "2000s", from: "2000", to: "2009" },
+  { label: "90s", from: "1990", to: "1999" },
+  { label: "80s", from: "1980", to: "1989" },
+  { label: "Clásicas (<1980)", from: "1900", to: "1979" },
+];
+
+const HISTORY_KEY = "txilms-search-history";
+const MAX_HISTORY = 8;
+
+function getSearchHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+  } catch { return []; }
+}
+
+function saveToHistory(term) {
+  if (!term.trim()) return;
+  let history = getSearchHistory().filter((h) => h !== term.trim());
+  history.unshift(term.trim());
+  if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+function removeFromHistory(term) {
+  const history = getSearchHistory().filter((h) => h !== term);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
 export default function Home() {
   const { country, setCountry, fetchLists, listsLoaded, watched } = useStore();
   const [query, setQuery] = useState("");
@@ -46,6 +94,30 @@ export default function Home() {
   const [suspenseLoading, setSuspenseLoading] = useState(true);
   const [recommended, setRecommended] = useState([]);
   const [recommendedLoading, setRecommendedLoading] = useState(true);
+  const [comedy, setComedy] = useState([]);
+  const [comedyLoading, setComedyLoading] = useState(true);
+  const [action, setAction] = useState([]);
+  const [actionLoading, setActionLoading] = useState(true);
+  const [horror, setHorror] = useState([]);
+  const [horrorLoading, setHorrorLoading] = useState(true);
+  const [scifi, setScifi] = useState([]);
+  const [scifiLoading, setScifiLoading] = useState(true);
+  const [drama, setDrama] = useState([]);
+  const [dramaLoading, setDramaLoading] = useState(true);
+
+  // Search filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterGenre, setFilterGenre] = useState("");
+  const [filterDecade, setFilterDecade] = useState(0); // index into DECADES
+  const [filterMinRating, setFilterMinRating] = useState(0);
+  const [filterResults, setFilterResults] = useState([]);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [isFilterActive, setIsFilterActive] = useState(false);
+
+  // Search history
+  const [searchHistory, setSearchHistory] = useState(getSearchHistory());
+  const [showHistory, setShowHistory] = useState(false);
+  const searchInputRef = useRef(null);
 
   // Close country dropdown on outside click
   useEffect(() => {
@@ -96,6 +168,41 @@ export default function Home() {
       .then((data) => setSuspense(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setSuspenseLoading(false));
+
+    // Comedy (genre 35)
+    setComedyLoading(true);
+    discoverMovies({ withGenres: "35", sortBy: "vote_average.desc", voteCountGte: 500 })
+      .then((data) => setComedy(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setComedyLoading(false));
+
+    // Action (genre 28)
+    setActionLoading(true);
+    discoverMovies({ withGenres: "28", sortBy: "vote_average.desc", voteCountGte: 500 })
+      .then((data) => setAction(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setActionLoading(false));
+
+    // Horror (genre 27)
+    setHorrorLoading(true);
+    discoverMovies({ withGenres: "27", sortBy: "vote_average.desc", voteCountGte: 300 })
+      .then((data) => setHorror(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setHorrorLoading(false));
+
+    // Sci-Fi (genre 878)
+    setScifiLoading(true);
+    discoverMovies({ withGenres: "878", sortBy: "vote_average.desc", voteCountGte: 300 })
+      .then((data) => setScifi(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setScifiLoading(false));
+
+    // Drama (genre 18)
+    setDramaLoading(true);
+    discoverMovies({ withGenres: "18", sortBy: "vote_average.desc", voteCountGte: 1000 })
+      .then((data) => setDrama(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setDramaLoading(false));
   }, []);
 
   // Recommendations based on user's last watched movie
@@ -125,6 +232,7 @@ export default function Home() {
   const handleSearch = useCallback(
     (value) => {
       setQuery(value);
+      setShowHistory(false);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (!value.trim()) {
         setResults([]);
@@ -135,6 +243,8 @@ export default function Home() {
         try {
           const data = await searchMovies(value.trim(), country);
           setResults(data.results || []);
+          saveToHistory(value.trim());
+          setSearchHistory(getSearchHistory());
         } catch {
           setResults([]);
         } finally {
@@ -144,6 +254,44 @@ export default function Home() {
     },
     [country]
   );
+
+  // Filter search
+  const applyFilters = useCallback(async () => {
+    setFilterLoading(true);
+    setIsFilterActive(true);
+    try {
+      const decade = DECADES[filterDecade];
+      const params = {
+        sortBy: "vote_average.desc",
+        voteCountGte: 100,
+      };
+      if (filterGenre) params.withGenres = filterGenre;
+      if (filterMinRating > 0) params.voteAverageGte = filterMinRating;
+      const data = await discoverMovies(params);
+      let items = Array.isArray(data) ? data : data.results || [];
+      // Client-side year filtering since TMDB discover doesn't have year range
+      if (decade.from) {
+        items = items.filter((m) => {
+          const yr = parseInt(m.year);
+          return yr >= parseInt(decade.from) && yr <= parseInt(decade.to);
+        });
+      }
+      setFilterResults(items);
+    } catch {
+      setFilterResults([]);
+    } finally {
+      setFilterLoading(false);
+    }
+  }, [filterGenre, filterDecade, filterMinRating]);
+
+  const clearFilters = () => {
+    setFilterGenre("");
+    setFilterDecade(0);
+    setFilterMinRating(0);
+    setIsFilterActive(false);
+    setFilterResults([]);
+    setShowFilters(false);
+  };
 
   const clearSearch = () => {
     setQuery("");
@@ -167,17 +315,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Search bar + country */}
+      {/* Search bar + country + filters */}
       <section className="sticky sticky-safe z-30 bg-cine-bg/80 backdrop-blur-lg border-b border-cine-border px-4 py-3">
         <div className="max-w-3xl mx-auto flex items-center gap-2">
           {/* Search input */}
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cine-muted" />
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Buscar película o serie…"
               value={query}
               onChange={(e) => handleSearch(e.target.value)}
+              onFocus={() => !query.trim() && searchHistory.length > 0 && setShowHistory(true)}
+              onBlur={() => setTimeout(() => setShowHistory(false), 200)}
               className="w-full pl-10 pr-9 py-2.5 bg-cine-card rounded-xl text-sm text-white placeholder-cine-muted ring-1 ring-cine-border focus:ring-cine-accent focus:outline-none transition"
             />
             {query && (
@@ -188,7 +339,56 @@ export default function Home() {
                 <X className="w-4 h-4" />
               </button>
             )}
+
+            {/* Search history dropdown */}
+            {showHistory && searchHistory.length > 0 && !query.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-cine-card rounded-xl ring-1 ring-cine-border shadow-xl overflow-hidden z-50">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-cine-border">
+                  <span className="text-[11px] text-cine-muted flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Búsquedas recientes
+                  </span>
+                </div>
+                {searchHistory.map((term) => (
+                  <div
+                    key={term}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-cine-border/40 transition cursor-pointer"
+                  >
+                    <button
+                      className="flex-1 text-left text-sm text-white"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSearch(term);
+                      }}
+                    >
+                      {term}
+                    </button>
+                    <button
+                      className="text-cine-muted hover:text-cine-accent transition p-0.5"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        removeFromHistory(term);
+                        setSearchHistory(getSearchHistory());
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Filters button */}
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1 px-3 py-2.5 rounded-xl text-sm ring-1 transition ${
+              isFilterActive || showFilters
+                ? "bg-cine-accent/10 ring-cine-accent text-cine-accent"
+                : "bg-cine-card ring-cine-border hover:ring-cine-accent text-cine-muted"
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+          </button>
 
           {/* Country selector */}
           <div className="relative" ref={countryRef}>
@@ -221,6 +421,75 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div className="max-w-3xl mx-auto mt-3 bg-cine-card rounded-xl ring-1 ring-cine-border p-4 animate-fadeInUp">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-bold flex items-center gap-1.5">
+                <Filter className="w-4 h-4 text-cine-accent" /> Filtros avanzados
+              </h3>
+              {isFilterActive && (
+                <button onClick={clearFilters} className="text-xs text-cine-accent hover:underline">
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Genre filter */}
+              <div>
+                <label className="text-[11px] text-cine-muted block mb-1">Género</label>
+                <select
+                  value={filterGenre}
+                  onChange={(e) => setFilterGenre(e.target.value)}
+                  className="w-full bg-cine-bg rounded-lg px-3 py-2 text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none"
+                >
+                  {GENRES.map((g) => (
+                    <option key={g.id} value={g.id}>{g.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Decade filter */}
+              <div>
+                <label className="text-[11px] text-cine-muted block mb-1">Época</label>
+                <select
+                  value={filterDecade}
+                  onChange={(e) => setFilterDecade(Number(e.target.value))}
+                  className="w-full bg-cine-bg rounded-lg px-3 py-2 text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none"
+                >
+                  {DECADES.map((d, i) => (
+                    <option key={i} value={i}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Min rating filter */}
+              <div>
+                <label className="text-[11px] text-cine-muted block mb-1">
+                  Nota mínima: {filterMinRating > 0 ? `${filterMinRating}+` : "Cualquiera"}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="9"
+                  step="1"
+                  value={filterMinRating}
+                  onChange={(e) => setFilterMinRating(Number(e.target.value))}
+                  className="w-full accent-cine-accent"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={applyFilters}
+              className="mt-3 w-full py-2 bg-cine-accent text-white rounded-xl text-sm font-semibold hover:bg-cine-accent/90 transition"
+            >
+              Buscar con filtros
+            </button>
+          </div>
+        )}
       </section>
 
       <div className="max-w-6xl mx-auto px-4 mt-6">
@@ -249,6 +518,39 @@ export default function Home() {
             ) : (
               <p className="text-cine-muted text-center py-12">
                 No se encontraron resultados
+              </p>
+            )}
+          </section>
+        ) : isFilterActive ? (
+          /* Filter results */
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Filter className="w-5 h-5 text-cine-accent" />
+                Resultados filtrados
+                <span className="text-sm text-cine-muted font-normal">
+                  ({filterResults.length} películas)
+                </span>
+              </h2>
+              <button onClick={clearFilters} className="text-sm text-cine-accent hover:underline">
+                Limpiar
+              </button>
+            </div>
+            {filterLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="aspect-[2/3] rounded-xl skeleton" />
+                ))}
+              </div>
+            ) : filterResults.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {filterResults.map((m) => (
+                  <MovieCard key={m.tmdb_id} movie={m} size="full" />
+                ))}
+              </div>
+            ) : (
+              <p className="text-cine-muted text-center py-12">
+                No se encontraron películas con esos filtros
               </p>
             )}
           </section>
@@ -339,6 +641,41 @@ export default function Home() {
               title="🔪 Mejores de suspense"
               movies={suspense}
               loading={suspenseLoading}
+            />
+
+            {/* Comedy */}
+            <MovieRow
+              title="😂 Mejores comedias"
+              movies={comedy}
+              loading={comedyLoading}
+            />
+
+            {/* Action */}
+            <MovieRow
+              title="💥 Mejores de acción"
+              movies={action}
+              loading={actionLoading}
+            />
+
+            {/* Drama */}
+            <MovieRow
+              title="🎭 Mejores dramas"
+              movies={drama}
+              loading={dramaLoading}
+            />
+
+            {/* Horror */}
+            <MovieRow
+              title="👻 Mejores de terror"
+              movies={horror}
+              loading={horrorLoading}
+            />
+
+            {/* Sci-Fi */}
+            <MovieRow
+              title="🚀 Mejores de ciencia ficción"
+              movies={scifi}
+              loading={scifiLoading}
             />
           </>
         )}

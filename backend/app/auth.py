@@ -267,3 +267,34 @@ async def require_admin(request: Request) -> Dict[str, Any]:
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
     return user
+
+
+async def change_password(user_id: str, old_password: str, new_password: str, username: str) -> Dict[str, Any]:
+    """Cambia la contraseña de un usuario verificando la antigua."""
+    if len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 4 caracteres")
+
+    email = _email_for(username)
+
+    # Verify old password by attempting login
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_AUTH_URL}/token?grant_type=password",
+            headers={"apikey": SUPABASE_KEY, "Content-Type": "application/json"},
+            json={"email": email, "password": old_password},
+        )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=401, detail="Contraseña actual incorrecta")
+
+    # Update password via admin API
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.put(
+            f"{_AUTH_URL}/admin/users/{user_id}",
+            headers=_admin_headers(),
+            json={"password": new_password},
+        )
+        if resp.status_code != 200:
+            logger.error(f"Error changing password: {resp.text}")
+            raise HTTPException(status_code=500, detail="Error al cambiar la contraseña")
+
+    return {"ok": True, "message": "Contraseña actualizada correctamente"}

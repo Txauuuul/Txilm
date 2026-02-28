@@ -10,12 +10,24 @@ import {
   Copy,
   Check,
   LogOut,
+  BarChart3,
+  Lock,
+  UserPlus,
+  UserMinus,
+  Users,
 } from "lucide-react";
 import {
   getProfile,
   getUserLists,
   generateInviteCodes,
   getInviteCodes,
+  getMyStats,
+  getUserStats,
+  changePassword,
+  followUser,
+  unfollowUser,
+  getFollowCounts,
+  getFollowing,
 } from "../api/api";
 import useAuthStore from "../store/useAuthStore";
 
@@ -52,6 +64,22 @@ export default function Profile() {
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(null);
 
+  // Stats
+  const [stats, setStats] = useState(null);
+  const [showStats, setShowStats] = useState(false);
+
+  // Change password
+  const [showPassword, setShowPassword] = useState(false);
+  const [oldPw, setOldPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [pwMsg, setPwMsg] = useState(null);
+  const [pwLoading, setPwLoading] = useState(false);
+
+  // Follow system
+  const [followCounts, setFollowCounts] = useState({ following: 0, followers: 0 });
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+
   useEffect(() => {
     if (!targetId) return;
     setLoading(true);
@@ -74,6 +102,24 @@ export default function Profile() {
     }
   }, [isMe, currentUser]);
 
+  // Load stats
+  useEffect(() => {
+    if (!targetId) return;
+    const fetchStats = isMe ? getMyStats : () => getUserStats(targetId);
+    fetchStats().then(setStats).catch(() => {});
+  }, [targetId, isMe]);
+
+  // Load follow counts and status
+  useEffect(() => {
+    if (!targetId) return;
+    getFollowCounts(targetId).then(setFollowCounts).catch(() => {});
+    if (!isMe && currentUser) {
+      getFollowing().then((following) => {
+        setIsFollowing(following.includes(targetId));
+      }).catch(() => {});
+    }
+  }, [targetId, isMe, currentUser]);
+
   const filteredList = lists.filter((i) => i.list_type === tab);
 
   const handleGenerate = async () => {
@@ -93,6 +139,42 @@ export default function Profile() {
     navigator.clipboard.writeText(code);
     setCopied(code);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleFollow = async () => {
+    if (followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await unfollowUser(targetId);
+        setIsFollowing(false);
+        setFollowCounts((c) => ({ ...c, followers: Math.max(0, c.followers - 1) }));
+      } else {
+        await followUser(targetId);
+        setIsFollowing(true);
+        setFollowCounts((c) => ({ ...c, followers: c.followers + 1 }));
+      }
+    } catch {}
+    setFollowLoading(false);
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (newPw.length < 6) {
+      setPwMsg({ type: "error", text: "La nueva contraseña debe tener al menos 6 caracteres" });
+      return;
+    }
+    setPwLoading(true);
+    setPwMsg(null);
+    try {
+      await changePassword(oldPw, newPw);
+      setPwMsg({ type: "success", text: "Contraseña cambiada correctamente" });
+      setOldPw("");
+      setNewPw("");
+    } catch (err) {
+      setPwMsg({ type: "error", text: err.response?.data?.detail || "Error al cambiar contraseña" });
+    }
+    setPwLoading(false);
   };
 
   if (loading) {
@@ -139,19 +221,175 @@ export default function Profile() {
             </span>
           </div>
 
-          {isMe && (
+          {/* Follow counts */}
+          <div className="flex items-center justify-center gap-4 mt-2">
+            <span className="text-sm">
+              <span className="font-bold text-white">{followCounts.followers}</span>{" "}
+              <span className="text-cine-muted text-xs">seguidores</span>
+            </span>
+            <span className="text-sm">
+              <span className="font-bold text-white">{followCounts.following}</span>{" "}
+              <span className="text-cine-muted text-xs">siguiendo</span>
+            </span>
+          </div>
+
+          {/* Follow / Unfollow button for other users */}
+          {!isMe && currentUser && (
             <button
-              onClick={() => {
-                logout();
-                window.location.href = "/login";
-              }}
-              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+              onClick={handleFollow}
+              disabled={followLoading}
+              className={`mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                isFollowing
+                  ? "bg-cine-card text-cine-muted ring-1 ring-cine-border hover:text-cine-accent hover:ring-cine-accent"
+                  : "bg-cine-accent text-white hover:bg-cine-accent/90"
+              }`}
             >
-              <LogOut className="w-3.5 h-3.5" /> Cerrar sesión
+              {isFollowing ? (
+                <>
+                  <UserMinus className="w-4 h-4" /> Dejar de seguir
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4" /> Seguir
+                </>
+              )}
             </button>
+          )}
+
+          {isMe && (
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <button
+                onClick={() => {
+                  logout();
+                  window.location.href = "/login";
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Cerrar sesión
+              </button>
+              <button
+                onClick={() => setShowPassword(!showPassword)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+              >
+                <Lock className="w-3.5 h-3.5" /> Cambiar contraseña
+              </button>
+              <button
+                onClick={() => setShowStats(!showStats)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+              >
+                <BarChart3 className="w-3.5 h-3.5" /> Estadísticas
+              </button>
+            </div>
           )}
         </div>
       </section>
+
+      {/* Change password form */}
+      {isMe && showPassword && (
+        <section className="max-w-md mx-auto px-4 mb-4 animate-fadeInUp">
+          <div className="bg-cine-card rounded-xl ring-1 ring-cine-border p-4">
+            <h3 className="text-sm font-bold mb-3 flex items-center gap-1.5">
+              <Lock className="w-4 h-4 text-cine-accent" /> Cambiar contraseña
+            </h3>
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <input
+                type="password"
+                placeholder="Contraseña actual"
+                value={oldPw}
+                onChange={(e) => setOldPw(e.target.value)}
+                className="w-full px-3 py-2 bg-cine-bg rounded-lg text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none"
+                required
+              />
+              <input
+                type="password"
+                placeholder="Nueva contraseña (mín. 6 caracteres)"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                className="w-full px-3 py-2 bg-cine-bg rounded-lg text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none"
+                required
+                minLength={6}
+              />
+              {pwMsg && (
+                <p className={`text-xs ${pwMsg.type === "error" ? "text-cine-accent" : "text-cine-green"}`}>
+                  {pwMsg.text}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={pwLoading}
+                className="w-full py-2 bg-cine-accent text-white rounded-lg text-sm font-semibold hover:bg-cine-accent/90 transition disabled:opacity-50"
+              >
+                {pwLoading ? "Cambiando…" : "Cambiar contraseña"}
+              </button>
+            </form>
+          </div>
+        </section>
+      )}
+
+      {/* Stats section */}
+      {showStats && stats && (
+        <section className="max-w-xl mx-auto px-4 mb-4 animate-fadeInUp">
+          <div className="bg-cine-card rounded-xl ring-1 ring-cine-border p-4">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-cine-accent" /> Estadísticas
+            </h3>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <StatCard label="Vistas" value={stats.total_watched} emoji="👁️" />
+              <StatCard label="Favoritas" value={stats.total_favorites} emoji="❤️" />
+              <StatCard label="Pendientes" value={stats.total_watchlist} emoji="🔖" />
+              <StatCard label="Media" value={stats.avg_rating ? `${stats.avg_rating}/10` : "—"} emoji="⭐" />
+            </div>
+
+            {/* Monthly chart */}
+            {stats.monthly_watched && (
+              <div className="mb-4">
+                <p className="text-[11px] text-cine-muted mb-2">Películas vistas por mes</p>
+                <div className="flex items-end gap-1 h-24">
+                  {stats.monthly_watched.map((m) => {
+                    const max = Math.max(...stats.monthly_watched.map((x) => x.count), 1);
+                    const h = Math.max((m.count / max) * 100, 4);
+                    return (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[9px] text-cine-muted">{m.count}</span>
+                        <div
+                          className="w-full bg-cine-accent/80 rounded-t transition-all"
+                          style={{ height: `${h}%` }}
+                        />
+                        <span className="text-[9px] text-cine-muted">{m.month}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Rating distribution */}
+            {stats.rating_distribution && (
+              <div>
+                <p className="text-[11px] text-cine-muted mb-2">Distribución de notas</p>
+                <div className="flex items-end gap-0.5 h-16">
+                  {Object.entries(stats.rating_distribution).map(([rating, count]) => {
+                    const max = Math.max(...Object.values(stats.rating_distribution), 1);
+                    const h = Math.max((count / max) * 100, 4);
+                    return (
+                      <div key={rating} className="flex-1 flex flex-col items-center gap-0.5">
+                        <span className="text-[8px] text-cine-muted">{count}</span>
+                        <div
+                          className="w-full bg-cine-gold/80 rounded-t transition-all"
+                          style={{ height: `${h}%` }}
+                        />
+                        <span className="text-[8px] text-cine-muted">{rating}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* list tabs */}
       <section className="sticky sticky-safe z-30 bg-cine-bg/80 backdrop-blur-lg border-b border-cine-border px-4 py-2">
@@ -288,6 +526,17 @@ export default function Profile() {
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+/* ── Helper component ── */
+function StatCard({ label, value, emoji }) {
+  return (
+    <div className="bg-cine-bg rounded-xl p-3 text-center ring-1 ring-cine-border">
+      <p className="text-lg">{emoji}</p>
+      <p className="text-lg font-extrabold text-white">{value}</p>
+      <p className="text-[10px] text-cine-muted">{label}</p>
     </div>
   );
 }

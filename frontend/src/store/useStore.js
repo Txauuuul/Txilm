@@ -145,6 +145,23 @@ const useStore = create(
         }
       },
       isWatched: (id) => get().watched.some((m) => m.tmdb_id === id),
+      getWatchedRating: (id) => {
+        const m = get().watched.find((m) => m.tmdb_id === id);
+        return m?.rating || null;
+      },
+      reRate: async (tmdbId, newRating) => {
+        const prev = get().watched;
+        set((s) => ({
+          watched: s.watched.map((m) =>
+            m.tmdb_id === tmdbId ? { ...m, rating: newRating, vote_average: newRating } : m
+          ),
+        }));
+        try {
+          await api.updateRating(tmdbId, newRating);
+        } catch {
+          set({ watched: prev });
+        }
+      },
       toggleWatched: (movie) => {
         const s = get();
         s.isWatched(movie.tmdb_id)

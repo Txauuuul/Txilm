@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Heart,
@@ -11,8 +11,12 @@ import {
   Film,
   Send,
   Star,
+  Play,
+  Pencil,
+  ListPlus,
+  Check,
 } from "lucide-react";
-import { getMovieDetail, getMovieRatings } from "../api/api";
+import { getMovieDetail, getMovieRatings, getRecommendations, getCustomLists, addToCustomList } from "../api/api";
 import useColorExtractor from "../hooks/useColorExtractor";
 import ScoreCard from "../components/ScoreCard";
 import ShareModal from "../components/ShareModal";
@@ -30,12 +34,18 @@ function imgUrl(path, size = "w500") {
 
 export default function Details() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showShare, setShowShare] = useState(false);
   const [showRating, setShowRating] = useState(false);
   const [friendRatings, setFriendRatings] = useState([]);
+  const [similarMovies, setSimilarMovies] = useState([]);
+  const [activeTrailer, setActiveTrailer] = useState(null);
+  const [customLists, setCustomLists] = useState([]);
+  const [showCustomListMenu, setShowCustomListMenu] = useState(false);
+  const [addedToList, setAddedToList] = useState(null);
 
   const {
     country,
@@ -46,6 +56,7 @@ export default function Details() {
     isWatched,
     addToWatched,
     removeFromWatched,
+    getWatchedRating,
     fetchLists,
     listsLoaded,
   } = useStore();
@@ -57,11 +68,14 @@ export default function Details() {
 
   useEffect(() => {
     if (!listsLoaded) fetchLists();
+    getCustomLists().then(setCustomLists).catch(() => {});
   }, []);
 
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setActiveTrailer(null);
+    setSimilarMovies([]);
     getMovieDetail(id, country)
       .then(setMovie)
       .catch(() => setError("No se pudo cargar la película"))
@@ -69,6 +83,9 @@ export default function Details() {
 
     // Load friend ratings
     getMovieRatings(id).then(setFriendRatings).catch(() => {});
+
+    // Load similar movies
+    getRecommendations(id).then((data) => setSimilarMovies(data?.slice(0, 12) || [])).catch(() => {});
   }, [id, country]);
 
   /* ───── loading skeleton ───── */
@@ -99,9 +116,9 @@ export default function Details() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-cine-muted text-lg">{error || "Película no encontrada"}</p>
-        <Link to="/" className="text-cine-accent hover:underline flex items-center gap-1">
+        <button onClick={() => navigate(-1)} className="text-cine-accent hover:underline flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Volver
-        </Link>
+        </button>
       </div>
     );
   }
@@ -136,12 +153,12 @@ export default function Details() {
           }}
         />
         {/* back button */}
-        <Link
-          to="/"
+        <button
+          onClick={() => navigate(-1)}
           className="absolute top-4 left-4 md:top-6 md:left-6 z-20 flex items-center gap-1.5 text-sm text-white/80 hover:text-white bg-black/40 backdrop-blur rounded-full px-3 py-1.5 transition"
         >
           <ArrowLeft className="w-4 h-4" /> Volver
-        </Link>
+        </button>
       </div>
 
       {/* ───── main content ───── */}
@@ -248,6 +265,52 @@ export default function Details() {
                 label="Enviar"
                 activeColor="text-cine-blue"
               />
+              {isWatched(movie.tmdb_id) && (
+                <ActionBtn
+                  active={true}
+                  onClick={() => setShowRating(true)}
+                  Icon={Pencil}
+                  label={`Re-puntuar (${getWatchedRating(movie.tmdb_id) || "?"})`}
+                  activeColor="text-cine-gold"
+                />
+              )}
+              {/* Add to custom list */}
+              {customLists.length > 0 && (
+                <div className="relative">
+                  <ActionBtn
+                    active={!!addedToList}
+                    onClick={() => setShowCustomListMenu(!showCustomListMenu)}
+                    Icon={addedToList ? Check : ListPlus}
+                    label={addedToList || "Añadir a lista"}
+                    activeColor="text-cine-green"
+                  />
+                  {showCustomListMenu && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-cine-card rounded-xl ring-1 ring-cine-border shadow-xl overflow-hidden z-50 animate-fadeInUp">
+                      {customLists.map((cl) => (
+                        <button
+                          key={cl.id}
+                          onClick={async () => {
+                            try {
+                              await addToCustomList(cl.id, {
+                                tmdb_id: movie.tmdb_id,
+                                movie_title: movie.title,
+                                movie_poster: movie.poster,
+                                movie_year: movie.year,
+                              });
+                              setAddedToList(cl.name);
+                              setTimeout(() => setAddedToList(null), 2000);
+                            } catch {}
+                            setShowCustomListMenu(false);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-cine-border/40 transition text-white"
+                        >
+                          {cl.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -403,6 +466,82 @@ export default function Details() {
             </div>
           </section>
         )}
+
+        {/* ───── tráilers ───── */}
+        {movie.videos?.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3 flex items-center gap-2">
+              <Play className="w-4 h-4 text-cine-accent" /> Tráilers y vídeos
+            </h2>
+            {activeTrailer ? (
+              <div className="relative w-full aspect-video rounded-xl overflow-hidden ring-1 ring-cine-border">
+                <iframe
+                  src={`https://www.youtube.com/embed/${activeTrailer}?autoplay=1&rel=0`}
+                  title="Trailer"
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            ) : null}
+            <div className="flex gap-3 overflow-x-auto no-scrollbar mt-3 pb-2">
+              {movie.videos.map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setActiveTrailer(v.key)}
+                  className={`flex-shrink-0 relative w-48 aspect-video rounded-lg overflow-hidden ring-1 transition group ${
+                    activeTrailer === v.key ? "ring-cine-accent" : "ring-cine-border hover:ring-white/30"
+                  }`}
+                >
+                  <img
+                    src={`https://img.youtube.com/vi/${v.key}/mqdefault.jpg`}
+                    alt={v.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/20 transition">
+                    <Play className="w-8 h-8 text-white fill-white/80" />
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
+                    <p className="text-[10px] text-white line-clamp-1">{v.name}</p>
+                    <p className="text-[9px] text-white/60">{v.type}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ───── películas similares ───── */}
+        {similarMovies.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3">Películas similares</h2>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              {similarMovies.map((sm) => (
+                <Link
+                  key={sm.tmdb_id}
+                  to={`/movie/${sm.tmdb_id}`}
+                  className="flex-shrink-0 w-28 group"
+                >
+                  {sm.poster ? (
+                    <img
+                      src={imgUrl(sm.poster, "w185")}
+                      alt={sm.title}
+                      className="w-full aspect-[2/3] rounded-lg object-cover ring-1 ring-cine-border group-hover:ring-cine-accent/50 transition"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[2/3] rounded-lg bg-cine-card ring-1 ring-cine-border flex items-center justify-center text-cine-muted">
+                      <Film className="w-6 h-6" />
+                    </div>
+                  )}
+                  <p className="text-[11px] font-medium mt-1 line-clamp-2 leading-tight group-hover:text-cine-accent transition">
+                    {sm.title}
+                  </p>
+                  {sm.year && <p className="text-[10px] text-cine-muted">{sm.year}</p>}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
 
       {/* ───── Modals ───── */}
@@ -412,9 +551,15 @@ export default function Details() {
       {showRating && movie && (
         <RatingModal
           movie={miniMovie}
+          initialRating={getWatchedRating(movie.tmdb_id)}
           onClose={() => setShowRating(false)}
           onConfirm={(rating) => {
-            addToWatched(miniMovie, rating);
+            if (isWatched(movie.tmdb_id)) {
+              // Re-rate: update existing rating
+              useStore.getState().reRate(movie.tmdb_id, rating);
+            } else {
+              addToWatched(miniMovie, rating);
+            }
             setShowRating(false);
           }}
         />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Heart, Bookmark, Eye, Trash2 } from "lucide-react";
+import { Heart, Bookmark, Eye, Trash2, ListPlus } from "lucide-react";
 import { Link } from "react-router-dom";
 import useStore from "../store/useStore";
 
@@ -51,9 +51,17 @@ export default function Lists() {
       <section className="px-4 pt-6 md:pt-10 pb-2">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl md:text-3xl font-extrabold">Mis Listas</h1>
-          <p className="text-cine-muted text-sm mt-1">
-            Gestiona tus películas favoritas, pendientes y vistas
-          </p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-cine-muted text-sm">
+              Gestiona tus películas favoritas, pendientes y vistas
+            </p>
+            <Link
+              to="/custom-lists"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-accent ring-1 ring-cine-accent/30 hover:bg-cine-accent/10 transition"
+            >
+              <ListPlus className="w-3.5 h-3.5" /> Listas personalizadas
+            </Link>
+          </div>
         </div>
       </section>
 

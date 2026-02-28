@@ -363,3 +363,201 @@ async def get_all_codes() -> List[Dict]:
             headers=_headers(),
         )
         return resp.json() if resp.status_code == 200 else []
+
+
+# ── Sistema de seguimiento (follows) ─────────────────────
+
+async def follow_user(follower_id: str, following_id: str) -> Dict:
+    """Seguir a un usuario."""
+    if follower_id == following_id:
+        return {"error": "No puedes seguirte a ti mismo"}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_REST_URL}/follows",
+            headers=_headers(prefer="return=representation"),
+            json={"follower_id": follower_id, "following_id": following_id},
+        )
+        if resp.status_code in (200, 201):
+            d = resp.json()
+            return d[0] if isinstance(d, list) else d
+        return {}
+
+
+async def unfollow_user(follower_id: str, following_id: str) -> bool:
+    """Dejar de seguir a un usuario."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.delete(
+            f"{_REST_URL}/follows?follower_id=eq.{follower_id}&following_id=eq.{following_id}",
+            headers=_headers(),
+        )
+        return resp.status_code in (200, 204)
+
+
+async def get_following(user_id: str) -> List[str]:
+    """IDs de usuarios que sigo."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/follows?follower_id=eq.{user_id}&select=following_id",
+            headers=_headers(),
+        )
+        if resp.status_code == 200:
+            return [r["following_id"] for r in resp.json()]
+        return []
+
+
+async def get_followers(user_id: str) -> List[str]:
+    """IDs de usuarios que me siguen."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/follows?following_id=eq.{user_id}&select=follower_id",
+            headers=_headers(),
+        )
+        if resp.status_code == 200:
+            return [r["follower_id"] for r in resp.json()]
+        return []
+
+
+async def get_follow_counts(user_id: str) -> Dict:
+    """Obtiene contadores de seguidores y seguidos."""
+    following = await get_following(user_id)
+    followers = await get_followers(user_id)
+    return {"following": len(following), "followers": len(followers)}
+
+
+# ── Listas personalizadas ────────────────────────────────
+
+async def get_custom_lists(user_id: str) -> List[Dict]:
+    """Obtiene las listas personalizadas de un usuario."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/custom_lists?user_id=eq.{user_id}&select=*&order=created_at.desc",
+            headers=_headers(),
+        )
+        return resp.json() if resp.status_code == 200 else []
+
+
+async def create_custom_list(user_id: str, name: str, description: str = None) -> Dict:
+    """Crea una nueva lista personalizada."""
+    body = {"user_id": user_id, "name": name}
+    if description:
+        body["description"] = description
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_REST_URL}/custom_lists",
+            headers=_headers(prefer="return=representation"),
+            json=body,
+        )
+        if resp.status_code in (200, 201):
+            d = resp.json()
+            return d[0] if isinstance(d, list) else d
+        return {}
+
+
+async def delete_custom_list(list_id: int, user_id: str) -> bool:
+    """Elimina una lista personalizada y sus items."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        # Delete items first
+        await client.delete(
+            f"{_REST_URL}/custom_list_items?list_id=eq.{list_id}",
+            headers=_headers(),
+        )
+        # Delete list
+        resp = await client.delete(
+            f"{_REST_URL}/custom_lists?id=eq.{list_id}&user_id=eq.{user_id}",
+            headers=_headers(),
+        )
+        return resp.status_code in (200, 204)
+
+
+async def get_custom_list_items(list_id: int) -> List[Dict]:
+    """Obtiene los items de una lista personalizada."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/custom_list_items?list_id=eq.{list_id}&select=*&order=created_at.desc",
+            headers=_headers(),
+        )
+        return resp.json() if resp.status_code == 200 else []
+
+
+async def add_to_custom_list(
+    list_id: int, tmdb_id: int, movie_title: str,
+    movie_poster: str = None, movie_year: str = None,
+) -> Dict:
+    """Añade una película a una lista personalizada."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_REST_URL}/custom_list_items",
+            headers=_headers(prefer="return=representation"),
+            json={
+                "list_id": list_id,
+                "tmdb_id": tmdb_id,
+                "movie_title": movie_title,
+                "movie_poster": movie_poster,
+                "movie_year": movie_year,
+            },
+        )
+        if resp.status_code in (200, 201):
+            d = resp.json()
+            return d[0] if isinstance(d, list) else d
+        return {}
+
+
+async def remove_from_custom_list(list_id: int, tmdb_id: int) -> bool:
+    """Elimina una película de una lista personalizada."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.delete(
+            f"{_REST_URL}/custom_list_items?list_id=eq.{list_id}&tmdb_id=eq.{tmdb_id}",
+            headers=_headers(),
+        )
+        return resp.status_code in (200, 204)
+
+
+# ── Estadísticas de perfil ────────────────────────────────
+
+async def get_user_stats(user_id: str) -> Dict:
+    """Calcula estadísticas del perfil de un usuario."""
+    lists = await get_user_lists(user_id)
+
+    watched = [i for i in lists if i["list_type"] == "watched"]
+    favorites = [i for i in lists if i["list_type"] == "favorite"]
+    watchlist_items = [i for i in lists if i["list_type"] == "watchlist"]
+
+    ratings = [i["rating"] for i in watched if i.get("rating")]
+    avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
+
+    # Movies per month (last 6 months)
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    monthly = {}
+    for item in watched:
+        try:
+            dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+            key = dt.strftime("%Y-%m")
+            monthly[key] = monthly.get(key, 0) + 1
+        except:
+            pass
+
+    # Last 6 months
+    months_data = []
+    for i in range(5, -1, -1):
+        d = now - timedelta(days=30 * i)
+        key = d.strftime("%Y-%m")
+        label = d.strftime("%b")
+        months_data.append({"month": label, "count": monthly.get(key, 0)})
+
+    # Rating distribution
+    rating_dist = {str(i): 0 for i in range(1, 11)}
+    for r in ratings:
+        rating_dist[str(r)] = rating_dist.get(str(r), 0) + 1
+
+    return {
+        "total_watched": len(watched),
+        "total_favorites": len(favorites),
+        "total_watchlist": len(watchlist_items),
+        "total_rated": len(ratings),
+        "avg_rating": avg_rating,
+        "monthly_watched": months_data,
+        "rating_distribution": rating_dist,
+    }

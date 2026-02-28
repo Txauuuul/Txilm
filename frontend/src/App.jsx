@@ -10,6 +10,7 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import Social from "./pages/Social";
+import CustomLists from "./pages/CustomLists";
 import useAuthStore from "./store/useAuthStore";
 import { getMe, refreshToken as apiRefresh } from "./api/api";
 
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+          <Route path="/custom-lists" element={<ProtectedRoute><CustomLists /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

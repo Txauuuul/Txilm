@@ -321,3 +321,94 @@ export async function getInviteCodes() {
   const { data } = await http.get("/admin/invite-codes");
   return data;
 }
+
+// ═══════════════════════════════════════════
+// Cambiar contraseña
+// ═══════════════════════════════════════════
+
+export async function changePassword(oldPassword, newPassword) {
+  const { data } = await http.post("/auth/change-password", {
+    old_password: oldPassword,
+    new_password: newPassword,
+  });
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Sistema de seguimiento (follows)
+// ═══════════════════════════════════════════
+
+export async function followUser(userId) {
+  const { data } = await http.post(`/follows/${userId}`);
+  return data;
+}
+
+export async function unfollowUser(userId) {
+  const { data } = await http.delete(`/follows/${userId}`);
+  return data;
+}
+
+export async function getFollowing() {
+  const { data } = await http.get("/follows/following");
+  return data;
+}
+
+export async function getFollowers() {
+  const { data } = await http.get("/follows/followers");
+  return data;
+}
+
+export async function getFollowCounts(userId) {
+  const { data } = await http.get(`/follows/counts/${userId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Listas personalizadas
+// ═══════════════════════════════════════════
+
+export async function getCustomLists() {
+  const { data } = await http.get("/custom-lists");
+  return data;
+}
+
+export async function createCustomList(name, description = null) {
+  const { data } = await http.post("/custom-lists", { name, description });
+  return data;
+}
+
+export async function deleteCustomList(listId) {
+  const { data } = await http.delete(`/custom-lists/${listId}`);
+  return data;
+}
+
+export async function getCustomListItems(listId) {
+  const { data } = await http.get(`/custom-lists/${listId}/items`);
+  return data;
+}
+
+export async function addToCustomList(listId, { tmdb_id, movie_title, movie_poster, movie_year }) {
+  const { data } = await http.post(`/custom-lists/${listId}/items`, {
+    tmdb_id, movie_title, movie_poster, movie_year,
+  });
+  return data;
+}
+
+export async function removeFromCustomList(listId, tmdbId) {
+  const { data } = await http.delete(`/custom-lists/${listId}/items/${tmdbId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Estadísticas
+// ═══════════════════════════════════════════
+
+export async function getMyStats() {
+  const { data } = await http.get("/stats");
+  return data;
+}
+
+export async function getUserStats(userId) {
+  const { data } = await http.get(`/stats/${userId}`);
+  return data;
+}
