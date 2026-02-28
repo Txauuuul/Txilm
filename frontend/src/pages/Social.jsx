@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Users, Heart, Eye, Bookmark, Star, Shield, UserPlus, UserMinus } from "lucide-react";
+import { Users, Heart, Eye, Bookmark, Star, Shield, UserPlus, UserMinus, Search } from "lucide-react";
 import { getProfiles, getUserLists, followUser, unfollowUser, getFollowing } from "../api/api";
 import useAuthStore from "../store/useAuthStore";
 
@@ -21,6 +21,8 @@ export default function Social() {
   const [loadingLists, setLoadingLists] = useState({});
   const [followingSet, setFollowingSet] = useState(new Set());
   const [followLoading, setFollowLoading] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState("all"); // all | following | followers
 
   useEffect(() => {
     setLoading(true);
@@ -77,6 +79,14 @@ export default function Social() {
     setFollowLoading(null);
   };
 
+  const filteredProfiles = profiles.filter((p) => {
+    const matchesSearch = !searchQuery.trim() || (p.username || "").toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    if (filter === "following") return followingSet.has(p.id);
+    if (filter === "followers") return false; // Can't determine followers client-side easily
+    return true;
+  });
+
   return (
     <div className="min-h-screen pb-24 md:pb-8">
       {/* header */}
@@ -88,6 +98,35 @@ export default function Social() {
           <p className="text-cine-muted text-sm mt-1">
             Usuarios de la plataforma y sus películas
           </p>
+
+          {/* Search bar + filter tabs */}
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cine-muted" />
+              <input
+                type="text"
+                placeholder="Buscar usuario…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-cine-card rounded-xl text-sm text-white placeholder-cine-muted ring-1 ring-cine-border focus:ring-cine-accent focus:outline-none transition"
+              />
+            </div>
+            <div className="flex gap-1">
+              {[{ key: "all", label: "Todos" }, { key: "following", label: "Siguiendo" }].map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium transition ring-1 ${
+                    filter === f.key
+                      ? "bg-cine-accent/10 ring-cine-accent text-cine-accent"
+                      : "bg-cine-card ring-cine-border text-cine-muted hover:text-white"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -103,9 +142,13 @@ export default function Social() {
           <p className="text-center text-cine-muted py-12">
             No hay usuarios todavía
           </p>
+        ) : filteredProfiles.length === 0 ? (
+          <p className="text-center text-cine-muted py-12">
+            {searchQuery.trim() ? `No se encontraron usuarios con "${searchQuery}"` : "No sigues a nadie aún"}
+          </p>
         ) : (
           <div className="space-y-3">
-            {profiles.map((p) => {
+            {filteredProfiles.map((p) => {
               const isExpanded = expanded === p.id;
               const isMe = p.id === currentUser?.id;
               const lists = userLists[p.id] || [];

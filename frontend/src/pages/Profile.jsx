@@ -235,25 +235,41 @@ export default function Profile() {
 
           {/* Follow / Unfollow button for other users */}
           {!isMe && currentUser && (
-            <button
-              onClick={handleFollow}
-              disabled={followLoading}
-              className={`mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition ${
-                isFollowing
-                  ? "bg-cine-card text-cine-muted ring-1 ring-cine-border hover:text-cine-accent hover:ring-cine-accent"
-                  : "bg-cine-accent text-white hover:bg-cine-accent/90"
-              }`}
-            >
-              {isFollowing ? (
-                <>
-                  <UserMinus className="w-4 h-4" /> Dejar de seguir
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" /> Seguir
-                </>
-              )}
-            </button>
+            <div className="flex flex-col items-center gap-2 mt-3">
+              <button
+                onClick={handleFollow}
+                disabled={followLoading}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition ${
+                  isFollowing
+                    ? "bg-cine-card text-cine-muted ring-1 ring-cine-border hover:text-cine-accent hover:ring-cine-accent"
+                    : "bg-cine-accent text-white hover:bg-cine-accent/90"
+                }`}
+              >
+                {isFollowing ? (
+                  <>
+                    <UserMinus className="w-4 h-4" /> Dejar de seguir
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4" /> Seguir
+                  </>
+                )}
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowStats(!showStats)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" /> Estadísticas
+                </button>
+                <Link
+                  to={`/achievements/${targetId}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-gold ring-1 ring-cine-border hover:ring-cine-gold transition"
+                >
+                  🏆 Logros
+                </Link>
+              </div>
+            </div>
           )}
 
           {isMe && (

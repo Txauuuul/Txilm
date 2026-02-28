@@ -297,7 +297,7 @@ export default function Home() {
       if (filterMinRating > 0) params.voteAverageGte = filterMinRating;
       if (filterProviders.length > 0) {
         params.withWatchProviders = filterProviders.join("|");
-        params.watchRegion = "ES";
+        params.watchRegion = country;
       }
       const data = await discoverMovies(params);
       let items = Array.isArray(data) ? data : data.results || [];
@@ -547,7 +547,7 @@ export default function Home() {
             {/* Streaming platform multi-select */}
             <div className="mt-3">
               <label className="text-[11px] text-cine-muted block mb-1.5">
-                Plataformas {filterProviders.length > 0 && `(${filterProviders.length})`}
+                Plataformas en {country} {filterProviders.length > 0 && <span className="text-cine-accent font-semibold">({filterProviders.length} seleccionadas)</span>}
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {PLATFORMS.map((p) => {
