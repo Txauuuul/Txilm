@@ -208,10 +208,12 @@ async def discover_movies(
     with_genres: str = None,
     vote_count_gte: int = 100,
     vote_average_gte: float = None,
+    with_watch_providers: str = None,
+    watch_region: str = None,
     page: int = 1,
 ) -> List[Dict[str, Any]]:
     """
-    Descubre películas por criterios: género, puntuación mínima, etc.
+    Descubre películas por criterios: género, puntuación mínima, plataformas, etc.
     Ideal para secciones como 'Mejores de animación', 'Mejores de suspense', etc.
     """
     extra = {"sort_by": sort_by, "page": page, "vote_count.gte": vote_count_gte}
@@ -219,6 +221,9 @@ async def discover_movies(
         extra["with_genres"] = with_genres
     if vote_average_gte is not None:
         extra["vote_average.gte"] = vote_average_gte
+    if with_watch_providers:
+        extra["with_watch_providers"] = with_watch_providers
+        extra["watch_region"] = watch_region or "ES"
 
     resp = await _client.get(
         f"{TMDB_BASE_URL}/discover/movie",
@@ -234,6 +239,8 @@ async def discover_movies(
             "title": item.get("title", ""),
             "original_title": item.get("original_title", ""),
             "year": (item.get("release_date") or "")[:4],
+            "release_date": item.get("release_date", ""),
+            "vote_average": item.get("vote_average", 0),
             "poster": _poster_url(item.get("poster_path")),
             "backdrop": _backdrop_url(item.get("backdrop_path")),
         })

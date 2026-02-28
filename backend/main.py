@@ -384,17 +384,20 @@ async def health_check():
     }
 
 
-@app.get("/discover", response_model=List[TrendingItem], tags=["Descubrir"])
+@app.get("/discover", tags=["Descubrir"])
 async def discover(
     sort_by: str = Query("popularity.desc", description="Criterio de ordenación"),
     with_genres: Optional[str] = Query(None, description="IDs de género separados por coma"),
     vote_count_gte: int = Query(100, description="Mínimo de votos"),
     vote_average_gte: Optional[float] = Query(None, description="Puntuación media mínima"),
+    with_watch_providers: Optional[str] = Query(None, description="IDs de plataforma separados por |"),
+    watch_region: Optional[str] = Query(None, description="País para plataformas (ej: ES)"),
     page: int = Query(1, ge=1, le=20),
 ):
     """
-    Descubre películas por género, puntuación y popularidad.
+    Descubre películas por género, puntuación, plataformas y popularidad.
     Géneros populares: 16=Animación, 53=Suspense, 28=Acción, 35=Comedia, 18=Drama, 27=Terror.
+    Plataformas: 8=Netflix, 337=Disney+, 119=Prime Video, 384=HBO Max, 2=Apple TV+.
     """
     if not TMDB_API_KEY:
         raise HTTPException(status_code=503, detail="TMDB_API_KEY no configurada.")
@@ -405,6 +408,8 @@ async def discover(
             with_genres=with_genres,
             vote_count_gte=vote_count_gte,
             vote_average_gte=vote_average_gte,
+            with_watch_providers=with_watch_providers,
+            watch_region=watch_region,
             page=page,
         )
         return data

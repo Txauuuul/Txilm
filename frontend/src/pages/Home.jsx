@@ -51,6 +51,26 @@ const DECADES = [
   { label: "Clásicas (<1980)", from: "1900", to: "1979" },
 ];
 
+const PLATFORMS = [
+  { id: "8", label: "Netflix", color: "bg-red-600" },
+  { id: "337", label: "Disney+", color: "bg-blue-700" },
+  { id: "119", label: "Prime Video", color: "bg-sky-600" },
+  { id: "384", label: "HBO Max", color: "bg-purple-700" },
+  { id: "2", label: "Apple TV+", color: "bg-gray-700" },
+  { id: "149", label: "Movistar+", color: "bg-green-600" },
+  { id: "350", label: "Apple TV", color: "bg-gray-600" },
+  { id: "531", label: "Paramount+", color: "bg-blue-600" },
+  { id: "1899", label: "Max", color: "bg-indigo-700" },
+  { id: "63", label: "Filmin", color: "bg-orange-600" },
+];
+
+const SORT_OPTIONS = [
+  { value: "popularity", label: "Popularidad" },
+  { value: "rating", label: "Mejor valoradas" },
+  { value: "date_desc", label: "Más recientes" },
+  { value: "date_asc", label: "Más antiguas" },
+];
+
 const HISTORY_KEY = "txilms-search-history";
 const MAX_HISTORY = 8;
 
@@ -110,6 +130,8 @@ export default function Home() {
   const [filterGenre, setFilterGenre] = useState("");
   const [filterDecade, setFilterDecade] = useState(0); // index into DECADES
   const [filterMinRating, setFilterMinRating] = useState(0);
+  const [filterProviders, setFilterProviders] = useState([]);
+  const [filterSort, setFilterSort] = useState("popularity");
   const [filterResults, setFilterResults] = useState([]);
   const [filterLoading, setFilterLoading] = useState(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
@@ -261,12 +283,22 @@ export default function Home() {
     setIsFilterActive(true);
     try {
       const decade = DECADES[filterDecade];
+      const sortByMap = {
+        popularity: "popularity.desc",
+        rating: "vote_average.desc",
+        date_desc: "primary_release_date.desc",
+        date_asc: "primary_release_date.asc",
+      };
       const params = {
-        sortBy: "vote_average.desc",
-        voteCountGte: 100,
+        sortBy: sortByMap[filterSort] || "popularity.desc",
+        voteCountGte: filterSort === "rating" ? 200 : 100,
       };
       if (filterGenre) params.withGenres = filterGenre;
       if (filterMinRating > 0) params.voteAverageGte = filterMinRating;
+      if (filterProviders.length > 0) {
+        params.withWatchProviders = filterProviders.join("|");
+        params.watchRegion = "ES";
+      }
       const data = await discoverMovies(params);
       let items = Array.isArray(data) ? data : data.results || [];
       // Client-side year filtering since TMDB discover doesn't have year range
@@ -276,21 +308,37 @@ export default function Home() {
           return yr >= parseInt(decade.from) && yr <= parseInt(decade.to);
         });
       }
+      // Client-side sort for rating/date (in case TMDB sort differs)
+      if (filterSort === "rating") {
+        items.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+      } else if (filterSort === "date_desc") {
+        items.sort((a, b) => (b.release_date || "").localeCompare(a.release_date || ""));
+      } else if (filterSort === "date_asc") {
+        items.sort((a, b) => (a.release_date || "").localeCompare(b.release_date || ""));
+      }
       setFilterResults(items);
     } catch {
       setFilterResults([]);
     } finally {
       setFilterLoading(false);
     }
-  }, [filterGenre, filterDecade, filterMinRating]);
+  }, [filterGenre, filterDecade, filterMinRating, filterProviders, filterSort]);
 
   const clearFilters = () => {
     setFilterGenre("");
     setFilterDecade(0);
     setFilterMinRating(0);
+    setFilterProviders([]);
+    setFilterSort("popularity");
     setIsFilterActive(false);
     setFilterResults([]);
     setShowFilters(false);
+  };
+
+  const toggleProvider = (id) => {
+    setFilterProviders((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
   };
 
   const clearSearch = () => {
@@ -465,20 +513,59 @@ export default function Home() {
                 </select>
               </div>
 
-              {/* Min rating filter */}
+              {/* Sort filter */}
               <div>
-                <label className="text-[11px] text-cine-muted block mb-1">
-                  Nota mínima: {filterMinRating > 0 ? `${filterMinRating}+` : "Cualquiera"}
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="9"
-                  step="1"
-                  value={filterMinRating}
-                  onChange={(e) => setFilterMinRating(Number(e.target.value))}
-                  className="w-full accent-cine-accent"
-                />
+                <label className="text-[11px] text-cine-muted block mb-1">Ordenar por</label>
+                <select
+                  value={filterSort}
+                  onChange={(e) => setFilterSort(e.target.value)}
+                  className="w-full bg-cine-bg rounded-lg px-3 py-2 text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none"
+                >
+                  {SORT_OPTIONS.map((s) => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Min rating slider (decimal) */}
+            <div className="mt-3">
+              <label className="text-[11px] text-cine-muted block mb-1">
+                Nota mínima: {filterMinRating > 0 ? `${Number(filterMinRating).toFixed(1)}+` : "Cualquiera"}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="9"
+                step="0.5"
+                value={filterMinRating}
+                onChange={(e) => setFilterMinRating(Number(e.target.value))}
+                className="w-full accent-cine-accent"
+              />
+            </div>
+
+            {/* Streaming platform multi-select */}
+            <div className="mt-3">
+              <label className="text-[11px] text-cine-muted block mb-1.5">
+                Plataformas {filterProviders.length > 0 && `(${filterProviders.length})`}
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {PLATFORMS.map((p) => {
+                  const selected = filterProviders.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => toggleProvider(p.id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ring-1 ${
+                        selected
+                          ? `${p.color} text-white ring-transparent`
+                          : "bg-cine-bg text-cine-muted ring-cine-border hover:text-white hover:ring-white/30"
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

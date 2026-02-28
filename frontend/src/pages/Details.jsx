@@ -162,7 +162,7 @@ export default function Details() {
       </div>
 
       {/* ───── main content ───── */}
-      <div className="max-w-4xl mx-auto px-4 -mt-36 md:-mt-44 relative z-10 overflow-hidden">
+      <div className="max-w-4xl mx-auto px-4 -mt-36 md:-mt-44 relative z-10">
         {/* poster + meta row */}
         <div className="flex gap-4 md:gap-6">
           {/* poster */}
@@ -270,7 +270,7 @@ export default function Details() {
                   active={true}
                   onClick={() => setShowRating(true)}
                   Icon={Pencil}
-                  label={`Re-puntuar (${getWatchedRating(movie.tmdb_id) || "?"})`}
+                  label={`Re-puntuar (${getWatchedRating(movie.tmdb_id)?.toFixed?.(1) || getWatchedRating(movie.tmdb_id) || "?"})`}
                   activeColor="text-cine-gold"
                 />
               )}
@@ -574,13 +574,13 @@ function ActionBtn({ active, onClick, Icon, label, activeColor }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ring-1 whitespace-nowrap ${
+      className={`flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition ring-1 ${
         active
           ? `${activeColor} bg-white/5 ring-current`
           : "text-cine-muted ring-cine-border hover:ring-white/30 hover:text-white"
       }`}
     >
-      <Icon className="w-3.5 h-3.5" fill={active ? "currentColor" : "none"} />
+      <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" fill={active ? "currentColor" : "none"} />
       {label}
     </button>
   );

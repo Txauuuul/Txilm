@@ -3,10 +3,9 @@ import { X, Star } from "lucide-react";
 
 export default function RatingModal({ movie, onConfirm, onClose, initialRating = 0 }) {
   const [rating, setRating] = useState(initialRating || 0);
-  const [hover, setHover] = useState(0);
 
   const handleConfirm = () => {
-    if (rating < 1) return;
+    if (rating < 0.5) return;
     onConfirm(rating);
   };
 
@@ -30,35 +29,53 @@ export default function RatingModal({ movie, onConfirm, onClose, initialRating =
             <span className="text-white font-semibold">{movie.title}</span>?
           </p>
 
-          {/* Star rating 1-10 */}
+          {/* Star visual display */}
           <div className="flex justify-center gap-0.5">
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                onClick={() => setRating(n)}
-                onMouseEnter={() => setHover(n)}
-                onMouseLeave={() => setHover(0)}
-                className="p-0.5 transition"
-              >
-                <Star
-                  className={`w-6 h-6 transition ${
-                    n <= (hover || rating)
-                      ? "text-cine-gold fill-cine-gold"
-                      : "text-cine-border"
-                  }`}
-                />
-              </button>
-            ))}
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+              const filled = rating >= n;
+              const halfFilled = !filled && rating >= n - 0.5;
+              return (
+                <button
+                  key={n}
+                  onClick={() => setRating(rating === n ? n - 0.5 : n)}
+                  className="p-0.5 transition"
+                  title={`${n}`}
+                >
+                  <Star
+                    className={`w-6 h-6 transition ${
+                      filled
+                        ? "text-cine-gold fill-cine-gold"
+                        : halfFilled
+                        ? "text-cine-gold fill-cine-gold/50"
+                        : "text-cine-border"
+                    }`}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Decimal slider */}
+          <div>
+            <input
+              type="range"
+              min="0"
+              max="10"
+              step="0.5"
+              value={rating}
+              onChange={(e) => setRating(Number(e.target.value))}
+              className="w-full accent-cine-gold"
+            />
           </div>
 
           {/* Numeric display */}
           <p className="text-2xl font-extrabold text-cine-gold">
-            {rating > 0 ? `${rating}/10` : "—"}
+            {rating > 0 ? `${rating.toFixed(1)}/10` : "—"}
           </p>
 
           <button
             onClick={handleConfirm}
-            disabled={rating < 1}
+            disabled={rating < 0.5}
             className="w-full py-2.5 bg-cine-green text-white rounded-xl text-sm font-semibold hover:bg-cine-green/90 transition disabled:opacity-40"
           >
             Confirmar

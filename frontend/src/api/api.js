@@ -121,17 +121,21 @@ export async function getTrending(timeWindow = "week", page = 1) {
   return data;
 }
 
-/** Descubrir películas por género/criterio */
+/** Descubrir películas por género/criterio/plataforma */
 export async function discoverMovies({
   sortBy = "popularity.desc",
   withGenres = null,
   voteCountGte = 100,
   voteAverageGte = null,
+  withWatchProviders = null,
+  watchRegion = null,
   page = 1,
 } = {}) {
   const params = { sort_by: sortBy, vote_count_gte: voteCountGte, page };
   if (withGenres) params.with_genres = withGenres;
   if (voteAverageGte != null) params.vote_average_gte = voteAverageGte;
+  if (withWatchProviders) params.with_watch_providers = withWatchProviders;
+  if (watchRegion) params.watch_region = watchRegion;
   const { data } = await http.get("/discover", { params });
   return data;
 }
