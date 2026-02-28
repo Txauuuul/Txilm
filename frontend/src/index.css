@@ -9,13 +9,18 @@
   box-sizing: border-box;
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
+html,
 body {
+  scroll-behavior: smooth;
   min-height: 100dvh;
   overflow-x: hidden;
+  width: 100%;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 /* ── Scrollbar oscura ─────────────────────── */

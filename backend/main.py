@@ -37,6 +37,9 @@ from app.tmdb_service import (
     get_movie_detail,
     get_watch_providers,
     get_trending,
+    discover_movies,
+    get_top_rated,
+    get_recommendations,
 )
 from app.omdb_service import get_omdb_ratings
 from app.scraper_fa import get_filmaffinity_score
@@ -373,6 +376,68 @@ async def health_check():
         "omdb_configured": bool(OMDB_API_KEY),
         "supabase_configured": bool(SUPABASE_URL),
     }
+
+
+@app.get("/discover", response_model=List[TrendingItem], tags=["Descubrir"])
+async def discover(
+    sort_by: str = Query("popularity.desc", description="Criterio de ordenación"),
+    with_genres: Optional[str] = Query(None, description="IDs de género separados por coma"),
+    vote_count_gte: int = Query(100, description="Mínimo de votos"),
+    vote_average_gte: Optional[float] = Query(None, description="Puntuación media mínima"),
+    page: int = Query(1, ge=1, le=20),
+):
+    """
+    Descubre películas por género, puntuación y popularidad.
+    Géneros populares: 16=Animación, 53=Suspense, 28=Acción, 35=Comedia, 18=Drama, 27=Terror.
+    """
+    if not TMDB_API_KEY:
+        raise HTTPException(status_code=503, detail="TMDB_API_KEY no configurada.")
+
+    try:
+        data = await discover_movies(
+            sort_by=sort_by,
+            with_genres=with_genres,
+            vote_count_gte=vote_count_gte,
+            vote_average_gte=vote_average_gte,
+            page=page,
+        )
+        return data
+    except Exception as e:
+        logger.error(f"Error en discover: {e}")
+        raise HTTPException(status_code=500, detail="Error al descubrir películas.")
+
+
+@app.get("/top-rated", response_model=List[TrendingItem], tags=["Descubrir"])
+async def top_rated(
+    page: int = Query(1, ge=1, le=20),
+):
+    """Obtiene las películas mejor valoradas de todos los tiempos."""
+    if not TMDB_API_KEY:
+        raise HTTPException(status_code=503, detail="TMDB_API_KEY no configurada.")
+
+    try:
+        data = await get_top_rated(page=page)
+        return data
+    except Exception as e:
+        logger.error(f"Error en top rated: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener top rated.")
+
+
+@app.get("/recommendations/{tmdb_id}", response_model=List[TrendingItem], tags=["Descubrir"])
+async def recommendations(
+    tmdb_id: int,
+    page: int = Query(1, ge=1, le=20),
+):
+    """Obtiene recomendaciones basadas en una película."""
+    if not TMDB_API_KEY:
+        raise HTTPException(status_code=503, detail="TMDB_API_KEY no configurada.")
+
+    try:
+        data = await get_recommendations(tmdb_id=tmdb_id, page=page)
+        return data
+    except Exception as e:
+        logger.error(f"Error en recomendaciones: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener recomendaciones.")
 
 
 # ══════════════════════════════════════════════════════════

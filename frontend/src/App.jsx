@@ -28,7 +28,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="bg-cine-bg text-white min-h-screen">
+    <div className="bg-cine-bg text-white min-h-screen overflow-x-hidden max-w-full">
       {isAuthenticated && <Navbar />}
       {/* main area: safe-area top on mobile, fixed-nav offset on desktop */}
       <main className={isAuthenticated ? "safe-top" : ""}>

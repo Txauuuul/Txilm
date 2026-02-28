@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, X, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { searchMovies, getTrending, getActivity } from "../api/api";
+import {
+  searchMovies,
+  getTrending,
+  getActivity,
+  discoverMovies,
+  getTopRated,
+  getRecommendations,
+} from "../api/api";
 import MovieCard from "../components/MovieCard";
 import useStore from "../store/useStore";
 
@@ -19,7 +26,7 @@ const COUNTRIES = [
 ];
 
 export default function Home() {
-  const { country, setCountry, fetchLists, listsLoaded } = useStore();
+  const { country, setCountry, fetchLists, listsLoaded, watched } = useStore();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [trending, setTrending] = useState([]);
@@ -29,6 +36,16 @@ export default function Home() {
   const [showCountry, setShowCountry] = useState(false);
   const debounceRef = useRef(null);
   const countryRef = useRef(null);
+
+  // New sections state
+  const [topRated, setTopRated] = useState([]);
+  const [topRatedLoading, setTopRatedLoading] = useState(true);
+  const [animation, setAnimation] = useState([]);
+  const [animationLoading, setAnimationLoading] = useState(true);
+  const [suspense, setSuspense] = useState([]);
+  const [suspenseLoading, setSuspenseLoading] = useState(true);
+  const [recommended, setRecommended] = useState([]);
+  const [recommendedLoading, setRecommendedLoading] = useState(true);
 
   // Close country dropdown on outside click
   useEffect(() => {
@@ -40,7 +57,7 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Fetch trending + activity + lists on mount
+  // Fetch trending + activity + lists + new sections on mount
   useEffect(() => {
     setTrendingLoading(true);
     getTrending("week", 1)
@@ -50,7 +67,59 @@ export default function Home() {
 
     getActivity(15).then(setActivity).catch(() => {});
     if (!listsLoaded) fetchLists();
+
+    // Top rated
+    setTopRatedLoading(true);
+    getTopRated(1)
+      .then((data) => setTopRated(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setTopRatedLoading(false));
+
+    // Best animation (genre 16)
+    setAnimationLoading(true);
+    discoverMovies({
+      withGenres: "16",
+      sortBy: "vote_average.desc",
+      voteCountGte: 500,
+    })
+      .then((data) => setAnimation(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setAnimationLoading(false));
+
+    // Best suspense/thriller (genre 53)
+    setSuspenseLoading(true);
+    discoverMovies({
+      withGenres: "53",
+      sortBy: "vote_average.desc",
+      voteCountGte: 500,
+    })
+      .then((data) => setSuspense(Array.isArray(data) ? data : data.results || []))
+      .catch(() => {})
+      .finally(() => setSuspenseLoading(false));
   }, []);
+
+  // Recommendations based on user's last watched movie
+  useEffect(() => {
+    setRecommendedLoading(true);
+    if (watched && watched.length > 0) {
+      const lastWatched = watched[0];
+      getRecommendations(lastWatched.tmdb_id)
+        .then((data) => setRecommended(Array.isArray(data) ? data : data.results || []))
+        .catch(() => {
+          // Fallback: popular movies
+          discoverMovies({ sortBy: "popularity.desc", voteCountGte: 300 })
+            .then((data) => setRecommended(Array.isArray(data) ? data : data.results || []))
+            .catch(() => {});
+        })
+        .finally(() => setRecommendedLoading(false));
+    } else {
+      // No watched movies: show popular as "recommended"
+      discoverMovies({ sortBy: "popularity.desc", voteCountGte: 300 })
+        .then((data) => setRecommended(Array.isArray(data) ? data : data.results || []))
+        .catch(() => {})
+        .finally(() => setRecommendedLoading(false));
+    }
+  }, [watched]);
 
   // Debounced search
   const handleSearch = useCallback(
@@ -84,7 +153,7 @@ export default function Home() {
   const showResults = query.trim().length > 0;
 
   return (
-    <div className="min-h-screen pb-24 md:pb-8">
+    <div className="min-h-screen pb-24 md:pb-8 overflow-x-hidden">
       {/* Hero / Header */}
       <section className="relative overflow-hidden px-4 pt-6 pb-4 md:pt-10 md:pb-6">
         <div className="max-w-3xl mx-auto text-center">
@@ -238,40 +307,77 @@ export default function Home() {
             )}
 
             {/* Trending section */}
-            <section>
-            <h2 className="text-lg font-bold mb-4">
-              🔥 Tendencias de la semana
-            </h2>
-            {trendingLoading ? (
-              <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-shrink-0 w-36 md:w-44 aspect-[2/3] rounded-xl skeleton"
-                  />
-                ))}
-              </div>
-            ) : (
-              <>
-                {/* Horizontal scroll on mobile, grid on larger screens */}
-                <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 md:hidden">
-                  {trending.map((m) => (
-                    <div key={m.tmdb_id} className="flex-shrink-0 w-36">
-                      <MovieCard movie={m} />
-                    </div>
-                  ))}
-                </div>
-                <div className="hidden md:grid md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                  {trending.map((m) => (
-                    <MovieCard key={m.tmdb_id} movie={m} size="full" />
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
+            <MovieRow
+              title="🔥 Tendencias de la semana"
+              movies={trending}
+              loading={trendingLoading}
+            />
+
+            {/* Recommended for you */}
+            <MovieRow
+              title="🎯 Recomendadas para ti"
+              movies={recommended}
+              loading={recommendedLoading}
+            />
+
+            {/* Top rated of all time */}
+            <MovieRow
+              title="🏆 Mejores de todos los tiempos"
+              movies={topRated}
+              loading={topRatedLoading}
+            />
+
+            {/* Best animation */}
+            <MovieRow
+              title="✨ Mejores de animación"
+              movies={animation}
+              loading={animationLoading}
+            />
+
+            {/* Best suspense/thriller */}
+            <MovieRow
+              title="🔪 Mejores de suspense"
+              movies={suspense}
+              loading={suspenseLoading}
+            />
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/* ── Reusable horizontal movie row ── */
+function MovieRow({ title, movies, loading }) {
+  return (
+    <section className="mb-8">
+      <h2 className="text-lg font-bold mb-4">{title}</h2>
+      {loading ? (
+        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-shrink-0 w-36 md:w-44 aspect-[2/3] rounded-xl skeleton"
+            />
+          ))}
+        </div>
+      ) : movies.length > 0 ? (
+        <>
+          {/* Horizontal scroll on mobile, grid on larger screens */}
+          <div className="flex gap-4 overflow-x-auto no-scrollbar pb-2 md:hidden">
+            {movies.map((m) => (
+              <div key={m.tmdb_id} className="flex-shrink-0 w-36">
+                <MovieCard movie={m} />
+              </div>
+            ))}
+          </div>
+          <div className="hidden md:grid md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {movies.map((m) => (
+              <MovieCard key={m.tmdb_id} movie={m} size="full" />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </section>
   );
 }

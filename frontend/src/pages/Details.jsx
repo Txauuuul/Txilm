@@ -118,7 +118,7 @@ export default function Details() {
   };
 
   return (
-    <div className="min-h-screen pb-24 md:pb-8">
+    <div className="min-h-screen pb-24 md:pb-8 overflow-x-hidden">
       {/* ───── backdrop hero ───── */}
       <div className="relative h-[340px] md:h-[420px] overflow-hidden">
         {backdropUrl && (
@@ -145,7 +145,7 @@ export default function Details() {
       </div>
 
       {/* ───── main content ───── */}
-      <div className="max-w-4xl mx-auto px-4 -mt-36 md:-mt-44 relative z-10">
+      <div className="max-w-4xl mx-auto px-4 -mt-36 md:-mt-44 relative z-10 overflow-hidden">
         {/* poster + meta row */}
         <div className="flex gap-4 md:gap-6">
           {/* poster */}
@@ -213,7 +213,7 @@ export default function Details() {
             )}
 
             {/* action buttons */}
-            <div className="flex gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-3">
               <ActionBtn
                 active={isFavorite(movie.tmdb_id)}
                 onClick={() => toggleFavorite(miniMovie)}
@@ -253,7 +253,7 @@ export default function Details() {
         </div>
 
         {/* ───── scores ───── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 overflow-hidden">
           <ScoreCard
             emoji="⭐"
             label="IMDb"
@@ -429,7 +429,7 @@ function ActionBtn({ active, onClick, Icon, label, activeColor }) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition ring-1 ${
+      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ring-1 whitespace-nowrap ${
         active
           ? `${activeColor} bg-white/5 ring-current`
           : "text-cine-muted ring-cine-border hover:ring-white/30 hover:text-white"

@@ -65,6 +65,35 @@ export async function getTrending(timeWindow = "week", page = 1) {
   return data;
 }
 
+/** Descubrir películas por género/criterio */
+export async function discoverMovies({
+  sortBy = "popularity.desc",
+  withGenres = null,
+  voteCountGte = 100,
+  voteAverageGte = null,
+  page = 1,
+} = {}) {
+  const params = { sort_by: sortBy, vote_count_gte: voteCountGte, page };
+  if (withGenres) params.with_genres = withGenres;
+  if (voteAverageGte != null) params.vote_average_gte = voteAverageGte;
+  const { data } = await http.get("/discover", { params });
+  return data;
+}
+
+/** Películas mejor valoradas */
+export async function getTopRated(page = 1) {
+  const { data } = await http.get("/top-rated", { params: { page } });
+  return data;
+}
+
+/** Recomendaciones basadas en una película */
+export async function getRecommendations(tmdbId, page = 1) {
+  const { data } = await http.get(`/recommendations/${tmdbId}`, {
+    params: { page },
+  });
+  return data;
+}
+
 /** Health check */
 export async function healthCheck() {
   const { data } = await http.get("/health");

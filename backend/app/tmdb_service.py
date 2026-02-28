@@ -185,3 +185,94 @@ async def get_trending(time_window: str = "week", page: int = 1) -> List[Dict[st
         })
 
     return results
+
+
+# ── Discover (categorías) ─────────────────────────────────
+async def discover_movies(
+    sort_by: str = "popularity.desc",
+    with_genres: str = None,
+    vote_count_gte: int = 100,
+    vote_average_gte: float = None,
+    page: int = 1,
+) -> List[Dict[str, Any]]:
+    """
+    Descubre películas por criterios: género, puntuación mínima, etc.
+    Ideal para secciones como 'Mejores de animación', 'Mejores de suspense', etc.
+    """
+    extra = {"sort_by": sort_by, "page": page, "vote_count.gte": vote_count_gte}
+    if with_genres:
+        extra["with_genres"] = with_genres
+    if vote_average_gte is not None:
+        extra["vote_average.gte"] = vote_average_gte
+
+    resp = await _client.get(
+        f"{TMDB_BASE_URL}/discover/movie",
+        params=_params(**extra),
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    results = []
+    for item in data.get("results", []):
+        results.append({
+            "tmdb_id": item["id"],
+            "title": item.get("title", ""),
+            "original_title": item.get("original_title", ""),
+            "year": (item.get("release_date") or "")[:4],
+            "poster": _poster_url(item.get("poster_path")),
+            "backdrop": _backdrop_url(item.get("backdrop_path")),
+        })
+
+    return results
+
+
+# ── Top Rated ─────────────────────────────────────────────
+async def get_top_rated(page: int = 1) -> List[Dict[str, Any]]:
+    """
+    Obtiene las películas mejor valoradas de todos los tiempos en TMDB.
+    """
+    resp = await _client.get(
+        f"{TMDB_BASE_URL}/movie/top_rated",
+        params=_params(page=page),
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    results = []
+    for item in data.get("results", []):
+        results.append({
+            "tmdb_id": item["id"],
+            "title": item.get("title", ""),
+            "original_title": item.get("original_title", ""),
+            "year": (item.get("release_date") or "")[:4],
+            "poster": _poster_url(item.get("poster_path")),
+            "backdrop": _backdrop_url(item.get("backdrop_path")),
+        })
+
+    return results
+
+
+# ── Recomendaciones ───────────────────────────────────────
+async def get_recommendations(tmdb_id: int, page: int = 1) -> List[Dict[str, Any]]:
+    """
+    Obtiene recomendaciones basadas en una película específica.
+    """
+    resp = await _client.get(
+        f"{TMDB_BASE_URL}/movie/{tmdb_id}/recommendations",
+        params=_params(page=page),
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    results = []
+    for item in data.get("results", []):
+        results.append({
+            "tmdb_id": item["id"],
+            "title": item.get("title", ""),
+            "original_title": item.get("original_title", ""),
+            "year": (item.get("release_date") or "")[:4],
+            "poster": _poster_url(item.get("poster_path")),
+            "backdrop": _backdrop_url(item.get("backdrop_path")),
+        })
+
+    return results
