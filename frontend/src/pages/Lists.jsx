@@ -51,13 +51,13 @@ export default function Lists() {
       <section className="px-4 pt-6 md:pt-10 pb-2">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl md:text-3xl font-extrabold">Mis Listas</h1>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-cine-muted text-sm">
+          <div className="flex items-center justify-between mt-1 gap-2">
+            <p className="text-cine-muted text-sm hidden sm:block">
               Gestiona tus películas favoritas, pendientes y vistas
             </p>
             <Link
               to="/custom-lists"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-accent ring-1 ring-cine-accent/30 hover:bg-cine-accent/10 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-accent ring-1 ring-cine-accent/30 hover:bg-cine-accent/10 transition whitespace-nowrap"
             >
               <ListPlus className="w-3.5 h-3.5" /> Listas personalizadas
             </Link>
@@ -75,16 +75,16 @@ export default function Lists() {
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`flex-1 sm:flex-none flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
                   active
                     ? `${color} bg-white/5 ring-1 ring-current`
                     : "text-cine-muted hover:text-white"
                 }`}
               >
                 <Icon className="w-4 h-4" fill={active ? "currentColor" : "none"} />
-                {label}
+                <span className="hidden xs:inline">{label}</span>
                 <span
-                  className={`ml-1 text-[11px] px-1.5 py-0.5 rounded-full ${
+                  className={`ml-0.5 sm:ml-1 text-[10px] sm:text-[11px] px-1 sm:px-1.5 py-0.5 rounded-full ${
                     active ? "bg-white/10" : "bg-cine-card"
                   }`}
                 >

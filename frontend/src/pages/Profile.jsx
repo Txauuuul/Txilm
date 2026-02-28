@@ -473,16 +473,16 @@ export default function Profile() {
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition ${
+                className={`flex-1 sm:flex-none flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition ${
                   active
                     ? `${color} bg-white/5 ring-1 ring-current`
                     : "text-cine-muted hover:text-white"
                 }`}
               >
                 <Icon className="w-4 h-4" fill={active ? "currentColor" : "none"} />
-                {label}
+                <span className="hidden xs:inline">{label}</span>
                 <span
-                  className={`ml-1 text-[11px] px-1.5 py-0.5 rounded-full ${
+                  className={`ml-0.5 sm:ml-1 text-[10px] sm:text-[11px] px-1 sm:px-1.5 py-0.5 rounded-full ${
                     active ? "bg-white/10" : "bg-cine-card"
                   }`}
                 >
