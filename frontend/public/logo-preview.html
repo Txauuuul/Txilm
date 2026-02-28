@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Txilms Logo Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap" rel="stylesheet">
+  <style>
+    body { background: #0a0a0f; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: Inter, system-ui, sans-serif; color: white; }
+    .sizes { display: flex; gap: 48px; align-items: flex-end; margin-top: 50px; }
+    .size-label { text-align: center; color: #8b8b9e; font-size: 12px; margin-top: 10px; }
+    h1 { color: #e50914; margin-bottom: 10px; }
+    p { color: #8b8b9e; margin-bottom: 40px; font-size: 14px; }
+    .main-logo { filter: drop-shadow(0 8px 32px rgba(229,9,20,0.3)); }
+  </style>
+</head>
+<body>
+  <h1>Txilms Logo</h1>
+  <p>Cuadrado rojo + cinta de película + "Tx"</p>
+
+  <!-- Tamaño grande -->
+  <svg class="main-logo" width="200" height="200" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="gM" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff1a1a"/><stop offset="100%" stop-color="#b30000"/></linearGradient>
+      <linearGradient id="sM" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff" stop-opacity="0.15"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect x="4" y="4" width="112" height="112" rx="28" fill="url(#gM)"/>
+    <rect x="4" y="4" width="112" height="112" rx="28" fill="url(#sM)"/>
+    <g transform="rotate(-25, 60, 60)" opacity="0.22">
+      <rect x="-5" y="42" width="130" height="36" rx="3" fill="#fff"/>
+      <rect x="4" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="18" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="32" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="46" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="60" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="74" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="88" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="102" y="44" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="4" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="18" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="32" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="46" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="60" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="74" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="88" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+      <rect x="102" y="71" width="7" height="5" rx="1.5" fill="url(#gM)"/>
+    </g>
+    <text x="60" y="80" text-anchor="middle" fill="#fff" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="52" letter-spacing="-3">Tx</text>
+    <g opacity="0.18">
+      <rect x="18" y="100" width="5" height="4" rx="1" fill="#fff"/>
+      <rect x="32" y="100" width="5" height="4" rx="1" fill="#fff"/>
+      <rect x="46" y="100" width="5" height="4" rx="1" fill="#fff"/>
+      <rect x="60" y="100" width="5" height="4" rx="1" fill="#fff"/>
+      <rect x="74" y="100" width="5" height="4" rx="1" fill="#fff"/>
+      <rect x="88" y="100" width="5" height="4" rx="1" fill="#fff"/>
+    </g>
+  </svg>
+
+  <div class="sizes">
+    <div>
+      <svg width="24" height="24" viewBox="0 0 120 120" fill="none"><defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff1a1a"/><stop offset="100%" stop-color="#b30000"/></linearGradient></defs><rect x="4" y="4" width="112" height="112" rx="28" fill="url(#g1)"/><g transform="rotate(-25,60,60)" opacity="0.22"><rect x="-5" y="42" width="130" height="36" rx="3" fill="#fff"/></g><text x="60" y="80" text-anchor="middle" fill="#fff" font-family="Inter,system-ui,sans-serif" font-weight="900" font-size="52" letter-spacing="-3">Tx</text></svg>
+      <div class="size-label">sm (24px)</div>
+    </div>
+    <div>
+      <svg width="40" height="40" viewBox="0 0 120 120" fill="none"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff1a1a"/><stop offset="100%" stop-color="#b30000"/></linearGradient></defs><rect x="4" y="4" width="112" height="112" rx="28" fill="url(#g2)"/><g transform="rotate(-25,60,60)" opacity="0.22"><rect x="-5" y="42" width="130" height="36" rx="3" fill="#fff"/></g><text x="60" y="80" text-anchor="middle" fill="#fff" font-family="Inter,system-ui,sans-serif" font-weight="900" font-size="52" letter-spacing="-3">Tx</text></svg>
+      <div class="size-label">md (40px)</div>
+    </div>
+    <div>
+      <svg width="64" height="64" viewBox="0 0 120 120" fill="none"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff1a1a"/><stop offset="100%" stop-color="#b30000"/></linearGradient></defs><rect x="4" y="4" width="112" height="112" rx="28" fill="url(#g3)"/><g transform="rotate(-25,60,60)" opacity="0.22"><rect x="-5" y="42" width="130" height="36" rx="3" fill="#fff"/><rect x="4" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="18" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="32" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="46" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="60" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="74" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="88" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="102" y="44" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="4" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="18" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="32" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="46" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="60" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="74" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="88" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/><rect x="102" y="71" width="7" height="5" rx="1.5" fill="url(#g3)"/></g><text x="60" y="80" text-anchor="middle" fill="#fff" font-family="Inter,system-ui,sans-serif" font-weight="900" font-size="52" letter-spacing="-3">Tx</text></svg>
+      <div class="size-label">lg (64px)</div>
+    </div>
+    <div>
+      <svg width="96" height="96" viewBox="0 0 120 120" fill="none"><defs><linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff1a1a"/><stop offset="100%" stop-color="#b30000"/></linearGradient></defs><rect x="4" y="4" width="112" height="112" rx="28" fill="url(#g4)"/><g transform="rotate(-25,60,60)" opacity="0.22"><rect x="-5" y="42" width="130" height="36" rx="3" fill="#fff"/><rect x="4" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="18" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="32" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="46" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="60" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="74" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="88" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="102" y="44" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="4" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="18" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="32" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="46" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="60" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="74" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="88" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/><rect x="102" y="71" width="7" height="5" rx="1.5" fill="url(#g4)"/></g><text x="60" y="80" text-anchor="middle" fill="#fff" font-family="Inter,system-ui,sans-serif" font-weight="900" font-size="52" letter-spacing="-3">Tx</text><g opacity="0.18"><rect x="18" y="100" width="5" height="4" rx="1" fill="#fff"/><rect x="32" y="100" width="5" height="4" rx="1" fill="#fff"/><rect x="46" y="100" width="5" height="4" rx="1" fill="#fff"/><rect x="60" y="100" width="5" height="4" rx="1" fill="#fff"/><rect x="74" y="100" width="5" height="4" rx="1" fill="#fff"/><rect x="88" y="100" width="5" height="4" rx="1" fill="#fff"/></g></svg>
+      <div class="size-label">xl (96px)</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 50px; display: flex; gap: 40px; align-items: center;">
+    <div style="text-align: center;">
+      <div style="background: #14141f; border: 1px solid #1e1e2e; border-radius: 12px; padding: 16px 24px; display: flex; align-items: center; gap: 12px;">
+        <svg width="40" height="40" viewBox="0 0 120 120" fill="none"><defs><linearGradient id="g5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff1a1a"/><stop offset="100%" stop-color="#b30000"/></linearGradient></defs><rect x="4" y="4" width="112" height="112" rx="28" fill="url(#g5)"/><g transform="rotate(-25,60,60)" opacity="0.22"><rect x="-5" y="42" width="130" height="36" rx="3" fill="#fff"/></g><text x="60" y="80" text-anchor="middle" fill="#fff" font-family="Inter,system-ui,sans-serif" font-weight="900" font-size="52" letter-spacing="-3">Tx</text></svg>
+        <span style="color: white; font-weight: 800; font-size: 18px;">Txilms</span>
+      </div>
+      <div class="size-label" style="margin-top: 12px;">Como se ve en la navbar</div>
+    </div>
+  </div>
+</body>
+</html>
