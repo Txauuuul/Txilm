@@ -19,6 +19,8 @@ export default function Navbar() {
     { to: "/profile", icon: User, label: "Perfil" },
   ];
 
+  const isDecember = new Date().getMonth() === 11;
+
   const MORE_ITEMS = [
     { to: "/feed", icon: Rss, label: "Feed" },
     { to: "/collections", icon: Film, label: "Colecciones" },
@@ -26,7 +28,7 @@ export default function Navbar() {
     { to: "/upcoming", icon: Calendar, label: "Estrenos" },
     { to: "/compare", icon: GitCompare, label: "Comparar" },
     { to: "/achievements", icon: Trophy, label: "Logros" },
-    { to: "/wrapped", icon: BarChart3, label: "Wrapped" },
+    ...(isDecember ? [{ to: "/wrapped", icon: BarChart3, label: "Wrapped" }] : []),
   ];
 
   const isMoreActive = MORE_ITEMS.some((m) => pathname === m.to);
@@ -139,7 +141,7 @@ export default function Navbar() {
               <span className="text-[10px] font-medium">Más</span>
             </button>
             {showMore && (
-              <div className="absolute right-0 bottom-full mb-2 w-52 bg-cine-card border border-cine-border rounded-xl shadow-xl overflow-hidden animate-fade-in">
+              <div className="absolute right-0 bottom-full mb-2 w-52 bg-cine-card border border-cine-border rounded-xl shadow-xl overflow-hidden overflow-y-auto max-h-[70vh] animate-fade-in">
                 <Link
                   to="/notifications"
                   onClick={() => setShowMore(false)}

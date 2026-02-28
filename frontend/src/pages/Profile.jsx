@@ -255,7 +255,7 @@ export default function Profile() {
                   </>
                 )}
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={() => setShowStats(!showStats)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
@@ -273,7 +273,7 @@ export default function Profile() {
           )}
 
           {isMe && (
-            <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-3 px-2">
               <button
                 onClick={() => {
                   logout();
@@ -301,7 +301,7 @@ export default function Profile() {
               >
                 🏆 Logros
               </Link>
-              {isMe && (
+              {new Date().getMonth() === 11 && (
                 <Link
                   to="/wrapped"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-purple-400 ring-1 ring-cine-border hover:ring-purple-400 transition"
