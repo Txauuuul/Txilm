@@ -35,7 +35,10 @@ from app.social import (
     get_follow_counts, get_custom_lists, create_custom_list,
     delete_custom_list, get_custom_list_items, add_to_custom_list,
     remove_from_custom_list, get_user_stats, compare_users,
-    get_recent_reviews,
+    get_recent_reviews, get_user_achievements, get_wrapped_stats,
+    predict_rating, get_following_feed, toggle_collaborative,
+    add_collaborative_editor, remove_collaborative_editor,
+    get_collaborative_editors, get_collaborative_lists_for_user,
 )
 from app.tmdb_service import (
     search_movies,
@@ -45,6 +48,7 @@ from app.tmdb_service import (
     discover_movies,
     get_top_rated,
     get_recommendations,
+    get_upcoming_movies,
 )
 from app.omdb_service import get_omdb_ratings
 from app.scraper_fa import get_filmaffinity_score
@@ -857,4 +861,130 @@ async def get_reviews_endpoint(request: Request, limit: int = Query(20, ge=1, le
     """Obtener reseñas recientes de todos los usuarios."""
     await require_auth(request)
     return await get_recent_reviews(limit)
+
+
+# ══════════════════════════════════════════════════════════
+# LOGROS Y BADGES
+# ══════════════════════════════════════════════════════════
+
+@app.get("/achievements", tags=["Logros"])
+async def get_my_achievements(request: Request):
+    """Obtener mis logros."""
+    user = await require_auth(request)
+    return await get_user_achievements(user["id"])
+
+
+@app.get("/achievements/{user_id}", tags=["Logros"])
+async def get_user_achievements_endpoint(request: Request, user_id: str):
+    """Obtener logros de un usuario."""
+    await require_auth(request)
+    return await get_user_achievements(user_id)
+
+
+# ══════════════════════════════════════════════════════════
+# WRAPPED (ESTADÍSTICAS ANUALES)
+# ══════════════════════════════════════════════════════════
+
+@app.get("/wrapped/{year}", tags=["Wrapped"])
+async def get_wrapped_endpoint(request: Request, year: int):
+    """Obtener mi resumen anual."""
+    user = await require_auth(request)
+    return await get_wrapped_stats(user["id"], year)
+
+
+@app.get("/wrapped/{year}/{user_id}", tags=["Wrapped"])
+async def get_user_wrapped_endpoint(request: Request, year: int, user_id: str):
+    """Obtener resumen anual de un usuario."""
+    await require_auth(request)
+    return await get_wrapped_stats(user_id, year)
+
+
+# ══════════════════════════════════════════════════════════
+# PREDICCIÓN DE RATING
+# ══════════════════════════════════════════════════════════
+
+@app.get("/predict/{tmdb_id}", tags=["Predicción"])
+async def predict_rating_endpoint(request: Request, tmdb_id: int):
+    """Predecir mi nota para una película."""
+    user = await require_auth(request)
+    return await predict_rating(user["id"], tmdb_id)
+
+
+# ══════════════════════════════════════════════════════════
+# FEED DE ACTIVIDAD (SOLO SEGUIDOS)
+# ══════════════════════════════════════════════════════════
+
+@app.get("/feed", tags=["Social"])
+async def get_feed_endpoint(request: Request, limit: int = Query(30, ge=1, le=100)):
+    """Obtener feed de actividad de usuarios que sigo."""
+    user = await require_auth(request)
+    return await get_following_feed(user["id"], limit)
+
+
+# ══════════════════════════════════════════════════════════
+# PRÓXIMOS ESTRENOS
+# ══════════════════════════════════════════════════════════
+
+@app.get("/upcoming", tags=["Descubrir"])
+async def get_upcoming_endpoint(
+    region: str = Query("ES", description="Código de país"),
+    page: int = Query(1, ge=1, le=10),
+):
+    """Obtener próximos estrenos."""
+    if not TMDB_API_KEY:
+        raise HTTPException(status_code=503, detail="TMDB_API_KEY no configurada.")
+    try:
+        return await get_upcoming_movies(region=region, page=page)
+    except Exception as e:
+        logger.error(f"Error en upcoming: {e}")
+        raise HTTPException(status_code=500, detail="Error al obtener estrenos.")
+
+
+# ══════════════════════════════════════════════════════════
+# LISTAS COLABORATIVAS
+# ══════════════════════════════════════════════════════════
+
+class ToggleCollaborativeRequest(BaseModel):
+    is_collaborative: bool
+
+class AddEditorRequest(BaseModel):
+    user_id: str
+
+
+@app.patch("/custom-lists/{list_id}/collaborative", tags=["Listas Colaborativas"])
+async def toggle_collaborative_endpoint(request: Request, list_id: int, body: ToggleCollaborativeRequest):
+    """Activar/desactivar modo colaborativo."""
+    user = await require_auth(request)
+    return await toggle_collaborative(list_id, user["id"], body.is_collaborative)
+
+
+@app.get("/custom-lists/{list_id}/editors", tags=["Listas Colaborativas"])
+async def get_editors_endpoint(request: Request, list_id: int):
+    """Obtener editores de una lista colaborativa."""
+    await require_auth(request)
+    return await get_collaborative_editors(list_id)
+
+
+@app.post("/custom-lists/{list_id}/editors", tags=["Listas Colaborativas"])
+async def add_editor_endpoint(request: Request, list_id: int, body: AddEditorRequest):
+    """Añadir editor a una lista colaborativa."""
+    await require_auth(request)
+    return await add_collaborative_editor(list_id, body.user_id)
+
+
+@app.delete("/custom-lists/{list_id}/editors/{editor_id}", tags=["Listas Colaborativas"])
+async def remove_editor_endpoint(request: Request, list_id: int, editor_id: str):
+    """Eliminar editor de una lista colaborativa."""
+    await require_auth(request)
+    success = await remove_collaborative_editor(list_id, editor_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="No encontrado")
+    return {"ok": True}
+
+
+@app.get("/collaborative-lists", tags=["Listas Colaborativas"])
+async def get_my_collaborative_lists(request: Request):
+    """Obtener listas colaborativas donde soy editor."""
+    user = await require_auth(request)
+    return await get_collaborative_lists_for_user(user["id"])
 

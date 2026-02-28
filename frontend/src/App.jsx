@@ -14,6 +14,10 @@ import CustomLists from "./pages/CustomLists";
 import Collections from "./pages/Collections";
 import WhatToWatch from "./pages/WhatToWatch";
 import Compare from "./pages/Compare";
+import Feed from "./pages/Feed";
+import Achievements from "./pages/Achievements";
+import Wrapped from "./pages/Wrapped";
+import Upcoming from "./pages/Upcoming";
 import useAuthStore from "./store/useAuthStore";
 import { getMe, refreshToken as apiRefresh } from "./api/api";
 
@@ -66,6 +70,11 @@ export default function App() {
           <Route path="/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
           <Route path="/what-to-watch" element={<ProtectedRoute><WhatToWatch /></ProtectedRoute>} />
           <Route path="/compare" element={<ProtectedRoute><Compare /></ProtectedRoute>} />
+          <Route path="/feed" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
+          <Route path="/achievements" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
+          <Route path="/achievements/:userId" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
+          <Route path="/wrapped" element={<ProtectedRoute><Wrapped /></ProtectedRoute>} />
+          <Route path="/upcoming" element={<ProtectedRoute><Upcoming /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

@@ -440,3 +440,91 @@ export async function getRecentReviews(limit = 20) {
   const { data } = await http.get("/reviews", { params: { limit } });
   return data;
 }
+
+// ═══════════════════════════════════════════
+// Logros
+// ═══════════════════════════════════════════
+
+export async function getMyAchievements() {
+  const { data } = await http.get("/achievements");
+  return data;
+}
+
+export async function getUserAchievements(userId) {
+  const { data } = await http.get(`/achievements/${userId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Wrapped (estadísticas anuales)
+// ═══════════════════════════════════════════
+
+export async function getWrapped(year) {
+  const { data } = await http.get(`/wrapped/${year}`);
+  return data;
+}
+
+export async function getUserWrapped(year, userId) {
+  const { data } = await http.get(`/wrapped/${year}/${userId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Predicción de rating
+// ═══════════════════════════════════════════
+
+export async function predictRating(tmdbId) {
+  const { data } = await http.get(`/predict/${tmdbId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Feed de actividad
+// ═══════════════════════════════════════════
+
+export async function getFeed(limit = 30) {
+  const { data } = await http.get("/feed", { params: { limit } });
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Próximos estrenos
+// ═══════════════════════════════════════════
+
+export async function getUpcoming(region = "ES", page = 1) {
+  const { data } = await http.get("/upcoming", { params: { region, page } });
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Listas colaborativas
+// ═══════════════════════════════════════════
+
+export async function toggleCollaborative(listId, isCollaborative) {
+  const { data } = await http.patch(`/custom-lists/${listId}/collaborative`, {
+    is_collaborative: isCollaborative,
+  });
+  return data;
+}
+
+export async function getCollaborativeEditors(listId) {
+  const { data } = await http.get(`/custom-lists/${listId}/editors`);
+  return data;
+}
+
+export async function addCollaborativeEditor(listId, userId) {
+  const { data } = await http.post(`/custom-lists/${listId}/editors`, {
+    user_id: userId,
+  });
+  return data;
+}
+
+export async function removeCollaborativeEditor(listId, userId) {
+  const { data } = await http.delete(`/custom-lists/${listId}/editors/${userId}`);
+  return data;
+}
+
+export async function getMyCollaborativeLists() {
+  const { data } = await http.get("/collaborative-lists");
+  return data;
+}

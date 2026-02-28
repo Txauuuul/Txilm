@@ -705,3 +705,395 @@ async def get_recent_reviews(limit: int = 20) -> List[Dict]:
                 item["username"] = profile.get("username", "???")
 
         return items
+
+
+# ── Logros y badges ───────────────────────────────────────
+
+async def get_user_achievements(user_id: str) -> Dict:
+    """Calcula los logros/badges de un usuario basándose en su actividad."""
+    lists = await get_user_lists(user_id)
+    following = await get_following(user_id)
+
+    watched = [i for i in lists if i["list_type"] == "watched"]
+    favorites = [i for i in lists if i["list_type"] == "favorite"]
+    ratings = [i["rating"] for i in watched if i.get("rating")]
+    reviews = [i for i in watched if i.get("review")]
+    avg_rating = sum(ratings) / len(ratings) if ratings else 0
+
+    # Genre diversity
+    genre_set = set()
+    for item in watched:
+        gids = item.get("genre_ids") or ""
+        for gid in gids.split(","):
+            gid = gid.strip()
+            if gid:
+                genre_set.add(gid)
+
+    # Streak calculation
+    from datetime import datetime, timezone, timedelta
+    watch_dates = set()
+    daily_counts = {}
+    for item in watched:
+        try:
+            dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+            d = dt.date()
+            watch_dates.add(d)
+            daily_counts[d] = daily_counts.get(d, 0) + 1
+        except:
+            pass
+
+    max_streak = 0
+    if watch_dates:
+        sorted_dates = sorted(watch_dates)
+        streak = 1
+        for i in range(1, len(sorted_dates)):
+            if (sorted_dates[i] - sorted_dates[i-1]).days == 1:
+                streak += 1
+                max_streak = max(max_streak, streak)
+            else:
+                streak = 1
+        max_streak = max(max_streak, streak)
+
+    max_daily = max(daily_counts.values()) if daily_counts else 0
+
+    # Genre distribution check
+    genre_counts = {}
+    for item in watched:
+        gids = item.get("genre_ids") or ""
+        for gid in gids.split(","):
+            gid = gid.strip()
+            if gid:
+                genre_counts[gid] = genre_counts.get(gid, 0) + 1
+    is_diversified = True
+    if genre_counts and len(watched) > 10:
+        max_pct = max(genre_counts.values()) / len(watched)
+        is_diversified = max_pct <= 0.30
+
+    all_achievements = [
+        {"id": "primera_peli", "emoji": "🎥", "name": "Primera película", "desc": "Ver tu primera película", "req": len(watched) >= 1},
+        {"id": "cinefilo_10", "emoji": "🎬", "name": "Cinéfilo novato", "desc": "Ver 10 películas", "req": len(watched) >= 10},
+        {"id": "cinefilo_50", "emoji": "🎬", "name": "Cinéfilo avanzado", "desc": "Ver 50 películas", "req": len(watched) >= 50},
+        {"id": "cinefilo_100", "emoji": "🎬", "name": "Cinéfilo experto", "desc": "Ver 100 películas", "req": len(watched) >= 100},
+        {"id": "cinefilo_250", "emoji": "🎬", "name": "Cinéfilo legendario", "desc": "Ver 250 películas", "req": len(watched) >= 250},
+        {"id": "critico_exigente", "emoji": "⭐", "name": "Crítico exigente", "desc": "Media de rating menor a 5", "req": len(ratings) >= 10 and avg_rating < 5},
+        {"id": "generoso", "emoji": "⭐", "name": "Generoso con las estrellas", "desc": "Media de rating mayor a 8", "req": len(ratings) >= 10 and avg_rating > 8},
+        {"id": "racha_3", "emoji": "🔥", "name": "En racha", "desc": "Racha de 3 días seguidos", "req": max_streak >= 3},
+        {"id": "racha_7", "emoji": "🔥", "name": "Semana cinéfila", "desc": "Racha de 7 días seguidos", "req": max_streak >= 7},
+        {"id": "racha_30", "emoji": "🔥", "name": "Mes imparable", "desc": "Racha de 30 días seguidos", "req": max_streak >= 30},
+        {"id": "explorador", "emoji": "🎭", "name": "Explorador de géneros", "desc": "Ver películas de 8+ géneros", "req": len(genre_set) >= 8},
+        {"id": "primera_resena", "emoji": "✏️", "name": "Primera reseña", "desc": "Escribir tu primera reseña", "req": len(reviews) >= 1},
+        {"id": "critico_literario", "emoji": "📝", "name": "Crítico literario", "desc": "Escribir 10+ reseñas", "req": len(reviews) >= 10},
+        {"id": "primer_fav", "emoji": "💕", "name": "Primera favorita", "desc": "Añadir tu primera favorita", "req": len(favorites) >= 1},
+        {"id": "coleccionista", "emoji": "❤️", "name": "Coleccionista", "desc": "Tener 20+ favoritas", "req": len(favorites) >= 20},
+        {"id": "social", "emoji": "👥", "name": "Social", "desc": "Seguir a 5+ usuarios", "req": len(following) >= 5},
+        {"id": "maratonista", "emoji": "🌙", "name": "Maratonista", "desc": "Ver 3+ películas en un día", "req": max_daily >= 3},
+        {"id": "diversificado", "emoji": "📊", "name": "Diversificado", "desc": "Ningún género supera el 30%", "req": is_diversified and len(watched) > 10},
+    ]
+
+    unlocked = [a for a in all_achievements if a["req"]]
+    locked = [a for a in all_achievements if not a["req"]]
+    for a in unlocked + locked:
+        del a["req"]
+
+    return {
+        "unlocked": unlocked,
+        "locked": locked,
+        "total": len(all_achievements),
+        "unlocked_count": len(unlocked),
+    }
+
+
+# ── Estadísticas Wrapped (anuales) ───────────────────────
+
+async def get_wrapped_stats(user_id: str, year: int) -> Dict:
+    """Genera estadísticas anuales tipo Spotify Wrapped."""
+    lists = await get_user_lists(user_id)
+    from datetime import datetime, timedelta
+
+    genre_map = {
+        "28": "Acción", "16": "Animación", "12": "Aventura", "35": "Comedia",
+        "80": "Crimen", "99": "Documental", "18": "Drama", "14": "Fantasía",
+        "27": "Terror", "10749": "Romance", "878": "Sci-Fi", "53": "Suspense",
+        "10751": "Familia", "36": "Historia", "10402": "Música", "9648": "Misterio",
+        "10752": "Bélica", "37": "Western", "10770": "TV Movie",
+    }
+
+    year_watched = []
+    for item in lists:
+        if item["list_type"] != "watched":
+            continue
+        try:
+            dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+            if dt.year == year:
+                year_watched.append(item)
+        except:
+            pass
+
+    if not year_watched:
+        return {"year": year, "total_movies": 0, "empty": True}
+
+    ratings = [i["rating"] for i in year_watched if i.get("rating")]
+    avg_rating = round(sum(ratings) / len(ratings), 1) if ratings else None
+
+    rated_movies = sorted([i for i in year_watched if i.get("rating")], key=lambda x: x["rating"], reverse=True)
+    best_movie = rated_movies[0] if rated_movies else None
+    worst_movie = rated_movies[-1] if len(rated_movies) > 1 else None
+
+    monthly = {}
+    for item in year_watched:
+        try:
+            dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+            monthly[dt.month] = monthly.get(dt.month, 0) + 1
+        except:
+            pass
+
+    month_names = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    monthly_data = [{"month": month_names[i], "count": monthly.get(i + 1, 0)} for i in range(12)]
+    busiest_month = max(monthly.items(), key=lambda x: x[1]) if monthly else (1, 0)
+
+    genre_counts = {}
+    for item in year_watched:
+        gids = item.get("genre_ids") or ""
+        for gid in gids.split(","):
+            gid = gid.strip()
+            if gid and gid in genre_map:
+                genre_counts[genre_map[gid]] = genre_counts.get(genre_map[gid], 0) + 1
+
+    top_genres = sorted(genre_counts.items(), key=lambda x: -x[1])[:5]
+    top_genre = top_genres[0][0] if top_genres else "N/A"
+
+    reviews_count = len([i for i in year_watched if i.get("review")])
+    estimated_hours = len(year_watched) * 2
+
+    watch_dates = set()
+    for item in year_watched:
+        try:
+            dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+            watch_dates.add(dt.date())
+        except:
+            pass
+
+    max_streak = 0
+    if watch_dates:
+        sorted_dates = sorted(watch_dates)
+        streak = 1
+        for i in range(1, len(sorted_dates)):
+            if (sorted_dates[i] - sorted_dates[i-1]).days == 1:
+                streak += 1
+                max_streak = max(max_streak, streak)
+            else:
+                streak = 1
+        max_streak = max(max_streak, streak)
+
+    return {
+        "year": year,
+        "empty": False,
+        "total_movies": len(year_watched),
+        "estimated_hours": estimated_hours,
+        "avg_rating": avg_rating,
+        "total_ratings": len(ratings),
+        "total_reviews": reviews_count,
+        "top_genre": top_genre,
+        "top_genres": [{"genre": g, "count": c} for g, c in top_genres],
+        "busiest_month": month_names[busiest_month[0] - 1],
+        "busiest_month_count": busiest_month[1],
+        "monthly_data": monthly_data,
+        "best_movie": {"title": best_movie.get("movie_title", ""), "poster": best_movie.get("movie_poster"), "rating": best_movie.get("rating"), "tmdb_id": best_movie.get("tmdb_id")} if best_movie else None,
+        "worst_movie": {"title": worst_movie.get("movie_title", ""), "poster": worst_movie.get("movie_poster"), "rating": worst_movie.get("rating"), "tmdb_id": worst_movie.get("tmdb_id")} if worst_movie else None,
+        "max_streak": max_streak,
+    }
+
+
+# ── Predicción de rating ──────────────────────────────────
+
+async def predict_rating(user_id: str, tmdb_id: int) -> Dict:
+    """
+    Predice nota usando collaborative filtering simple:
+    busca usuarios similares que hayan visto esta película.
+    """
+    my_lists = await get_user_lists(user_id)
+    my_watched = {i["tmdb_id"]: i.get("rating") for i in my_lists if i["list_type"] == "watched" and i.get("rating")}
+
+    if not my_watched:
+        return {"predicted_rating": None, "confidence": 0, "based_on": 0}
+
+    if tmdb_id in my_watched:
+        return {"predicted_rating": my_watched[tmdb_id], "confidence": 100, "based_on": 0, "already_rated": True}
+
+    movie_ratings = await get_movie_ratings(tmdb_id)
+    if not movie_ratings:
+        return {"predicted_rating": None, "confidence": 0, "based_on": 0}
+
+    weighted_sum = 0
+    weight_total = 0
+
+    for mr in movie_ratings:
+        other_id = mr["user_id"]
+        other_rating = mr.get("rating")
+        if not other_rating or other_id == user_id:
+            continue
+
+        other_lists = await get_user_lists(other_id)
+        other_watched = {i["tmdb_id"]: i.get("rating") for i in other_lists if i["list_type"] == "watched" and i.get("rating")}
+
+        common = set(my_watched.keys()) & set(other_watched.keys())
+        if len(common) < 2:
+            continue
+
+        total_diff = sum(abs(my_watched[tid] - other_watched[tid]) for tid in common)
+        avg_diff = total_diff / len(common)
+        similarity = max(0, 1 - avg_diff / 10)
+        weight = similarity * min(len(common), 20) / 20
+        weighted_sum += other_rating * weight
+        weight_total += weight
+
+    if weight_total == 0:
+        all_r = [mr.get("rating") for mr in movie_ratings if mr.get("rating")]
+        if all_r:
+            return {"predicted_rating": round(sum(all_r) / len(all_r), 1), "confidence": 20, "based_on": len(all_r)}
+        return {"predicted_rating": None, "confidence": 0, "based_on": 0}
+
+    return {
+        "predicted_rating": round(weighted_sum / weight_total, 1),
+        "confidence": min(90, int(weight_total * 30)),
+        "based_on": len([mr for mr in movie_ratings if mr["user_id"] != user_id]),
+    }
+
+
+# ── Feed de actividad (solo seguidos) ────────────────────
+
+async def get_following_feed(user_id: str, limit: int = 30) -> List[Dict]:
+    """Obtiene actividad reciente de los usuarios que sigo."""
+    following_ids = await get_following(user_id)
+    if not following_ids:
+        return []
+
+    ids_filter = ",".join(f'"{uid}"' for uid in following_ids)
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/user_lists?user_id=in.({ids_filter})"
+            f"&order=created_at.desc&limit={limit}&select=*",
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            return []
+
+        items = resp.json()
+        if items:
+            user_ids = list(set(i["user_id"] for i in items))
+            ids_str = ",".join(user_ids)
+            profiles_resp = await client.get(
+                f"{_REST_URL}/profiles?id=in.({ids_str})&select=id,username,avatar_url",
+                headers=_headers(),
+            )
+            profiles = {}
+            if profiles_resp.status_code == 200:
+                profiles = {p["id"]: p for p in profiles_resp.json()}
+
+            for item in items:
+                profile = profiles.get(item["user_id"], {})
+                item["username"] = profile.get("username", "???")
+                item["avatar_url"] = profile.get("avatar_url")
+
+        return items
+
+
+# ── Listas colaborativas ─────────────────────────────────
+
+async def toggle_collaborative(list_id: int, user_id: str, is_collaborative: bool) -> Dict:
+    """Activa o desactiva modo colaborativo en una lista."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.patch(
+            f"{_REST_URL}/custom_lists?id=eq.{list_id}&user_id=eq.{user_id}",
+            headers=_headers(prefer="return=representation"),
+            json={"is_collaborative": is_collaborative},
+        )
+        data = resp.json()
+        return data[0] if isinstance(data, list) and data else {}
+
+
+async def add_collaborative_editor(list_id: int, editor_user_id: str) -> Dict:
+    """Añade un editor a una lista colaborativa."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_REST_URL}/collaborative_list_editors",
+            headers=_headers(prefer="return=representation"),
+            json={"list_id": list_id, "user_id": editor_user_id},
+        )
+        if resp.status_code in (200, 201):
+            d = resp.json()
+            return d[0] if isinstance(d, list) else d
+        return {}
+
+
+async def remove_collaborative_editor(list_id: int, editor_user_id: str) -> bool:
+    """Elimina un editor de una lista colaborativa."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.delete(
+            f"{_REST_URL}/collaborative_list_editors?list_id=eq.{list_id}&user_id=eq.{editor_user_id}",
+            headers=_headers(),
+        )
+        return resp.status_code in (200, 204)
+
+
+async def get_collaborative_editors(list_id: int) -> List[Dict]:
+    """Obtiene los editores de una lista colaborativa."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/collaborative_list_editors?list_id=eq.{list_id}&select=user_id,added_at",
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            return []
+        editors = resp.json()
+        if editors:
+            user_ids = [e["user_id"] for e in editors]
+            ids_str = ",".join(user_ids)
+            profiles_resp = await client.get(
+                f"{_REST_URL}/profiles?id=in.({ids_str})&select=id,username",
+                headers=_headers(),
+            )
+            profiles = {}
+            if profiles_resp.status_code == 200:
+                profiles = {p["id"]: p for p in profiles_resp.json()}
+            for e in editors:
+                e["username"] = profiles.get(e["user_id"], {}).get("username", "???")
+        return editors
+
+
+async def get_collaborative_lists_for_user(user_id: str) -> List[Dict]:
+    """Obtiene listas colaborativas donde el usuario es editor."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/collaborative_list_editors?user_id=eq.{user_id}&select=list_id",
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            return []
+        list_ids = [e["list_id"] for e in resp.json()]
+        if not list_ids:
+            return []
+
+        ids_str = ",".join(str(lid) for lid in list_ids)
+        resp2 = await client.get(
+            f"{_REST_URL}/custom_lists?id=in.({ids_str})&select=*&order=created_at.desc",
+            headers=_headers(),
+        )
+        if resp2.status_code != 200:
+            return []
+
+        lists = resp2.json()
+        if lists:
+            owner_ids = list(set(l["user_id"] for l in lists))
+            ids_str2 = ",".join(owner_ids)
+            profiles_resp = await client.get(
+                f"{_REST_URL}/profiles?id=in.({ids_str2})&select=id,username",
+                headers=_headers(),
+            )
+            profiles = {}
+            if profiles_resp.status_code == 200:
+                profiles = {p["id"]: p for p in profiles_resp.json()}
+            for l in lists:
+                l["owner_username"] = profiles.get(l["user_id"], {}).get("username", "???")
+        return lists

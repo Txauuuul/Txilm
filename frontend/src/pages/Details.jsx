@@ -16,7 +16,7 @@ import {
   ListPlus,
   Check,
 } from "lucide-react";
-import { getMovieDetail, getMovieRatings, getRecommendations, getCustomLists, addToCustomList } from "../api/api";
+import { getMovieDetail, getMovieRatings, getRecommendations, getCustomLists, addToCustomList, predictRating } from "../api/api";
 import useColorExtractor from "../hooks/useColorExtractor";
 import ScoreCard from "../components/ScoreCard";
 import ShareModal from "../components/ShareModal";
@@ -46,6 +46,7 @@ export default function Details() {
   const [customLists, setCustomLists] = useState([]);
   const [showCustomListMenu, setShowCustomListMenu] = useState(false);
   const [addedToList, setAddedToList] = useState(null);
+  const [prediction, setPrediction] = useState(null);
 
   const {
     country,
@@ -83,6 +84,9 @@ export default function Details() {
 
     // Load friend ratings
     getMovieRatings(id).then(setFriendRatings).catch(() => {});
+
+    // Load rating prediction
+    predictRating(id).then(setPrediction).catch(() => setPrediction(null));
 
     // Load similar movies
     getRecommendations(id).then((data) => setSimilarMovies(data?.slice(0, 12) || [])).catch(() => {});
@@ -472,6 +476,37 @@ export default function Details() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* ───── rating prediction ───── */}
+        {prediction && prediction.predicted_rating && !prediction.already_rated && (
+          <section className="mt-6">
+            <div className="bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/20 rounded-2xl p-4">
+              <h2 className="text-sm font-bold mb-2 flex items-center gap-2">
+                🔮 Predicción para ti
+              </h2>
+              <div className="flex items-center gap-4">
+                <div className="text-3xl font-black text-cine-accent">
+                  {prediction.predicted_rating}
+                  <span className="text-base text-cine-muted font-normal">/10</span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs text-cine-muted">
+                    Confianza: {prediction.confidence}%
+                  </div>
+                  <div className="h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
+                    <div
+                      className="h-full bg-purple-400 rounded-full transition-all"
+                      style={{ width: `${prediction.confidence}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-cine-muted/60 mt-1">
+                    Basada en {prediction.based_on} usuario{prediction.based_on !== 1 ? "s" : ""} con gustos similares
+                  </p>
+                </div>
+              </div>
             </div>
           </section>
         )}

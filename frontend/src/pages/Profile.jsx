@@ -279,6 +279,20 @@ export default function Profile() {
               >
                 <BarChart3 className="w-3.5 h-3.5" /> Estadísticas
               </button>
+              <Link
+                to={isMe ? "/achievements" : `/achievements/${targetId}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-gold ring-1 ring-cine-border hover:ring-cine-gold transition"
+              >
+                🏆 Logros
+              </Link>
+              {isMe && (
+                <Link
+                  to="/wrapped"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-purple-400 ring-1 ring-cine-border hover:ring-purple-400 transition"
+                >
+                  📊 Wrapped
+                </Link>
+              )}
             </div>
           )}
         </div>

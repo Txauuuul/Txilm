@@ -298,3 +298,42 @@ async def get_recommendations(tmdb_id: int, page: int = 1) -> List[Dict[str, Any
         })
 
     return results
+
+
+# ── Próximos estrenos ─────────────────────────────────────
+async def get_upcoming_movies(region: str = "ES", page: int = 1) -> Dict[str, Any]:
+    """
+    Obtiene las películas que se estrenan próximamente.
+    """
+    resp = await _client.get(
+        f"{TMDB_BASE_URL}/movie/upcoming",
+        params=_params(page=page, region=region),
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    results = []
+    for item in data.get("results", []):
+        results.append({
+            "tmdb_id": item["id"],
+            "title": item.get("title", ""),
+            "original_title": item.get("original_title", ""),
+            "year": (item.get("release_date") or "")[:4],
+            "release_date": item.get("release_date", ""),
+            "overview": item.get("overview", ""),
+            "poster": _poster_url(item.get("poster_path")),
+            "backdrop": _backdrop_url(item.get("backdrop_path")),
+            "vote_average": item.get("vote_average", 0),
+            "genre_ids": item.get("genre_ids", []),
+        })
+
+    # Sort by release date
+    results.sort(key=lambda x: x.get("release_date", ""))
+
+    return {
+        "page": data.get("page", 1),
+        "total_pages": data.get("total_pages", 1),
+        "total_results": data.get("total_results", 0),
+        "dates": data.get("dates", {}),
+        "results": results,
+    }

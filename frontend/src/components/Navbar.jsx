@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import { Home, Heart, Bell, User, Users, MoreHorizontal, Film, Shuffle, GitCompare } from "lucide-react";
+import { Home, Heart, Bell, User, Users, MoreHorizontal, Film, Shuffle, GitCompare, Rss, Trophy, BarChart3, Calendar } from "lucide-react";
 import Logo from "./Logo";
 import NotificationBell from "./NotificationBell";
 import useAuthStore from "../store/useAuthStore";
@@ -20,9 +20,13 @@ export default function Navbar() {
   ];
 
   const MORE_ITEMS = [
+    { to: "/feed", icon: Rss, label: "Feed" },
     { to: "/collections", icon: Film, label: "Colecciones" },
     { to: "/what-to-watch", icon: Shuffle, label: "¿Qué veo?" },
-    { to: "/compare", icon: GitCompare, label: "Comparar gustos" },
+    { to: "/upcoming", icon: Calendar, label: "Estrenos" },
+    { to: "/compare", icon: GitCompare, label: "Comparar" },
+    { to: "/achievements", icon: Trophy, label: "Logros" },
+    { to: "/wrapped", icon: BarChart3, label: "Wrapped" },
   ];
 
   const isMoreActive = MORE_ITEMS.some((m) => pathname === m.to);
