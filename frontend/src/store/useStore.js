@@ -113,8 +113,8 @@ const useStore = create(
       },
 
       // ── Vistas (con puntuación) ──
-      addToWatched: async (movie, rating = null) => {
-        const item = { ...toListItem(movie, "watched"), rating };
+      addToWatched: async (movie, rating = null, review = null, genreIds = null) => {
+        const item = { ...toListItem(movie, "watched"), rating, review };
         set((s) => ({
           watched: s.watched.some((m) => m.tmdb_id === movie.tmdb_id)
             ? s.watched
@@ -128,6 +128,8 @@ const useStore = create(
             movie_poster: movie.poster,
             movie_year: movie.year,
             rating,
+            review,
+            genre_ids: genreIds,
           });
         } catch {
           set((s) => ({
@@ -149,7 +151,7 @@ const useStore = create(
         const m = get().watched.find((m) => m.tmdb_id === id);
         return m?.rating || null;
       },
-      reRate: async (tmdbId, newRating) => {
+      reRate: async (tmdbId, newRating, review = null) => {
         const prev = get().watched;
         set((s) => ({
           watched: s.watched.map((m) =>
@@ -157,7 +159,7 @@ const useStore = create(
           ),
         }));
         try {
-          await api.updateRating(tmdbId, newRating);
+          await api.updateRating(tmdbId, newRating, review);
         } catch {
           set({ watched: prev });
         }

@@ -215,6 +215,8 @@ export async function addToList({
   movie_poster = null,
   movie_year = null,
   rating = null,
+  review = null,
+  genre_ids = null,
 }) {
   const { data } = await http.post("/lists", {
     tmdb_id,
@@ -223,6 +225,8 @@ export async function addToList({
     movie_poster,
     movie_year,
     rating,
+    review,
+    genre_ids,
   });
   return data;
 }
@@ -232,8 +236,10 @@ export async function removeFromList(tmdbId, listType) {
   return data;
 }
 
-export async function updateRating(tmdbId, rating) {
-  const { data } = await http.put(`/lists/${tmdbId}/rating`, { rating });
+export async function updateRating(tmdbId, rating, review = null) {
+  const body = { rating };
+  if (review !== null) body.review = review;
+  const { data } = await http.put(`/lists/${tmdbId}/rating`, body);
   return data;
 }
 
@@ -414,5 +420,23 @@ export async function getMyStats() {
 
 export async function getUserStats(userId) {
   const { data } = await http.get(`/stats/${userId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Comparar gustos
+// ═══════════════════════════════════════════
+
+export async function compareUsers(userId) {
+  const { data } = await http.get(`/compare/${userId}`);
+  return data;
+}
+
+// ═══════════════════════════════════════════
+// Reseñas
+// ═══════════════════════════════════════════
+
+export async function getRecentReviews(limit = 20) {
+  const { data } = await http.get("/reviews", { params: { limit } });
   return data;
 }

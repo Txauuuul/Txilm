@@ -342,6 +342,48 @@ export default function Profile() {
               <StatCard label="Media" value={stats.avg_rating ? `${stats.avg_rating}/10` : "—"} emoji="⭐" />
             </div>
 
+            {/* Streak cards */}
+            {(stats.current_streak > 0 || stats.max_streak > 0) && (
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-cine-bg rounded-xl p-3 text-center ring-1 ring-cine-border">
+                  <p className="text-lg">🔥</p>
+                  <p className="text-lg font-extrabold text-orange-400">{stats.current_streak}</p>
+                  <p className="text-[10px] text-cine-muted">Racha actual (días)</p>
+                </div>
+                <div className="bg-cine-bg rounded-xl p-3 text-center ring-1 ring-cine-border">
+                  <p className="text-lg">🏆</p>
+                  <p className="text-lg font-extrabold text-cine-gold">{stats.max_streak}</p>
+                  <p className="text-[10px] text-cine-muted">Mejor racha (días)</p>
+                </div>
+              </div>
+            )}
+
+            {/* Genre breakdown */}
+            {stats.top_genres?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-[11px] text-cine-muted mb-2">Géneros más vistos</p>
+                <div className="space-y-1.5">
+                  {stats.top_genres.map((g) => {
+                    const max = stats.top_genres[0]?.count || 1;
+                    const pct = Math.max((g.count / max) * 100, 8);
+                    return (
+                      <div key={g.genre} className="flex items-center gap-2">
+                        <span className="text-[10px] text-cine-muted w-20 text-right flex-shrink-0 truncate">{g.genre}</span>
+                        <div className="flex-1 h-4 bg-cine-bg rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-cine-accent to-cine-accent/60 rounded-full transition-all flex items-center justify-end pr-1.5"
+                            style={{ width: `${pct}%` }}
+                          >
+                            <span className="text-[9px] font-bold text-white">{g.count}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Monthly chart */}
             {stats.monthly_watched && (
               <div className="mb-4">

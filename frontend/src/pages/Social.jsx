@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Users, Heart, Eye, Bookmark, Star, Shield } from "lucide-react";
-import { getProfiles, getUserLists } from "../api/api";
+import { Users, Heart, Eye, Bookmark, Star, Shield, UserPlus, UserMinus } from "lucide-react";
+import { getProfiles, getUserLists, followUser, unfollowUser, getFollowing } from "../api/api";
 import useAuthStore from "../store/useAuthStore";
 
 const TMDB_IMG = "https://image.tmdb.org/t/p";
@@ -19,6 +19,8 @@ export default function Social() {
   const [expanded, setExpanded] = useState(null); // userId expandido
   const [userLists, setUserLists] = useState({}); // { userId: items[] }
   const [loadingLists, setLoadingLists] = useState({});
+  const [followingSet, setFollowingSet] = useState(new Set());
+  const [followLoading, setFollowLoading] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -26,7 +28,14 @@ export default function Social() {
       .then(setProfiles)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+
+    // Load who I follow
+    if (currentUser) {
+      getFollowing()
+        .then((ids) => setFollowingSet(new Set(ids)))
+        .catch(() => {});
+    }
+  }, [currentUser]);
 
   const toggleExpand = async (userId) => {
     if (expanded === userId) {
@@ -51,6 +60,22 @@ export default function Social() {
 
   const getListByType = (userId, type) =>
     (userLists[userId] || []).filter((i) => i.list_type === type);
+
+  const handleFollow = async (userId, e) => {
+    e.stopPropagation();
+    if (followLoading) return;
+    setFollowLoading(userId);
+    try {
+      if (followingSet.has(userId)) {
+        await unfollowUser(userId);
+        setFollowingSet((prev) => { const s = new Set(prev); s.delete(userId); return s; });
+      } else {
+        await followUser(userId);
+        setFollowingSet((prev) => new Set(prev).add(userId));
+      }
+    } catch {}
+    setFollowLoading(null);
+  };
 
   return (
     <div className="min-h-screen pb-24 md:pb-8">
@@ -95,21 +120,29 @@ export default function Social() {
                   className="bg-cine-card rounded-xl ring-1 ring-cine-border overflow-hidden transition"
                 >
                   {/* User row */}
-                  <button
-                    onClick={() => toggleExpand(p.id)}
-                    className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition text-left"
-                  >
-                    {/* Avatar */}
-                    <div className="w-12 h-12 rounded-full bg-cine-border flex items-center justify-center text-lg font-bold uppercase text-cine-accent flex-shrink-0">
+                  <div className="flex items-center gap-3 p-4">
+                    {/* Avatar — links to profile */}
+                    <Link
+                      to={`/profile/${p.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-12 h-12 rounded-full bg-cine-border flex items-center justify-center text-lg font-bold uppercase text-cine-accent flex-shrink-0 hover:ring-2 hover:ring-cine-accent transition"
+                    >
                       {p.username?.charAt(0) || "?"}
-                    </div>
+                    </Link>
 
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
+                    {/* Info — clickable to expand */}
+                    <button
+                      onClick={() => toggleExpand(p.id)}
+                      className="flex-1 min-w-0 text-left hover:opacity-80 transition"
+                    >
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">
+                        <Link
+                          to={`/profile/${p.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-sm font-bold hover:text-cine-accent transition"
+                        >
                           {p.username}
-                        </span>
+                        </Link>
                         {isMe && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cine-accent/10 text-cine-accent">
                             Tú
@@ -126,25 +159,49 @@ export default function Social() {
                           year: "numeric",
                         })}
                       </p>
-                    </div>
+                    </button>
+
+                    {/* Follow button */}
+                    {!isMe && currentUser && (
+                      <button
+                        onClick={(e) => handleFollow(p.id, e)}
+                        disabled={followLoading === p.id}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition ring-1 flex-shrink-0 ${
+                          followingSet.has(p.id)
+                            ? "text-cine-accent ring-cine-accent bg-cine-accent/10 hover:bg-cine-accent/20"
+                            : "text-cine-muted ring-cine-border hover:text-cine-accent hover:ring-cine-accent"
+                        }`}
+                      >
+                        {followingSet.has(p.id) ? (
+                          <><UserMinus className="w-3.5 h-3.5" /> Siguiendo</>
+                        ) : (
+                          <><UserPlus className="w-3.5 h-3.5" /> Seguir</>
+                        )}
+                      </button>
+                    )}
 
                     {/* Expand chevron */}
-                    <svg
-                      className={`w-4 h-4 text-cine-muted transition-transform ${
-                        isExpanded ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
+                    <button
+                      onClick={() => toggleExpand(p.id)}
+                      className="p-1 text-cine-muted hover:text-white transition"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
+                      <svg
+                        className={`w-4 h-4 transition-transform ${
+                          isExpanded ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
+                  </div>
 
                   {/* Expanded content */}
                   {isExpanded && (

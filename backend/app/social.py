@@ -47,6 +47,7 @@ async def add_to_list(
     user_id: str, tmdb_id: int, list_type: str,
     movie_title: str, movie_poster: str = None,
     movie_year: str = None, rating: int = None,
+    review: str = None, genre_ids: str = None,
 ) -> Dict:
     """Añade una película a la lista de un usuario."""
     body = {
@@ -59,6 +60,10 @@ async def add_to_list(
     }
     if rating is not None and list_type == "watched":
         body["rating"] = rating
+    if review is not None and list_type == "watched":
+        body["review"] = review
+    if genre_ids:
+        body["genre_ids"] = genre_ids
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
@@ -94,13 +99,16 @@ async def remove_from_list(user_id: str, tmdb_id: int, list_type: str) -> bool:
         return resp.status_code in (200, 204)
 
 
-async def update_rating(user_id: str, tmdb_id: int, rating: int) -> Dict:
-    """Actualiza la puntuación de una película vista."""
+async def update_rating(user_id: str, tmdb_id: int, rating: int, review: str = None) -> Dict:
+    """Actualiza la puntuación y/o reseña de una película vista."""
+    body = {"rating": rating}
+    if review is not None:
+        body["review"] = review
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.patch(
             f"{_REST_URL}/user_lists?user_id=eq.{user_id}&tmdb_id=eq.{tmdb_id}&list_type=eq.watched",
             headers=_headers(prefer="return=representation"),
-            json={"rating": rating},
+            json=body,
         )
         data = resp.json()
         return data[0] if isinstance(data, list) and data else {}
@@ -110,7 +118,7 @@ async def get_movie_ratings(tmdb_id: int) -> List[Dict]:
     """Obtiene todas las puntuaciones de usuarios para una película."""
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(
-            f"{_REST_URL}/user_lists?tmdb_id=eq.{tmdb_id}&list_type=eq.watched&rating=not.is.null&select=user_id,rating,created_at",
+            f"{_REST_URL}/user_lists?tmdb_id=eq.{tmdb_id}&list_type=eq.watched&rating=not.is.null&select=user_id,rating,review,created_at",
             headers=_headers(),
         )
         if resp.status_code != 200:
@@ -550,7 +558,55 @@ async def get_user_stats(user_id: str) -> Dict:
     # Rating distribution
     rating_dist = {str(i): 0 for i in range(1, 11)}
     for r in ratings:
-        rating_dist[str(r)] = rating_dist.get(str(r), 0) + 1
+        key = str(int(r)) if isinstance(r, (int, float)) else str(r)
+        rating_dist[key] = rating_dist.get(key, 0) + 1
+
+    # Genre breakdown from genre_ids field
+    genre_map = {
+        "28": "Acción", "16": "Animación", "12": "Aventura", "35": "Comedia",
+        "80": "Crimen", "99": "Documental", "18": "Drama", "14": "Fantasía",
+        "27": "Terror", "10749": "Romance", "878": "Sci-Fi", "53": "Suspense",
+        "10751": "Familia", "36": "Historia", "10402": "Música", "9648": "Misterio",
+        "10752": "Bélica", "37": "Western", "10770": "TV Movie",
+    }
+    genre_counts = {}
+    for item in watched:
+        gids = item.get("genre_ids") or ""
+        for gid in gids.split(","):
+            gid = gid.strip()
+            if gid and gid in genre_map:
+                name = genre_map[gid]
+                genre_counts[name] = genre_counts.get(name, 0) + 1
+    # Sort by count descending
+    top_genres = sorted(genre_counts.items(), key=lambda x: -x[1])[:8]
+
+    # Watch streak (consecutive days with movies watched)
+    watch_dates = set()
+    for item in watched:
+        try:
+            dt = datetime.fromisoformat(item["created_at"].replace("Z", "+00:00"))
+            watch_dates.add(dt.date())
+        except:
+            pass
+    current_streak = 0
+    max_streak = 0
+    if watch_dates:
+        d = now.date()
+        streak = 0
+        while d in watch_dates:
+            streak += 1
+            d -= timedelta(days=1)
+        current_streak = streak
+        # Also compute max streak
+        sorted_dates = sorted(watch_dates)
+        streak = 1
+        for i in range(1, len(sorted_dates)):
+            if (sorted_dates[i] - sorted_dates[i-1]).days == 1:
+                streak += 1
+                max_streak = max(max_streak, streak)
+            else:
+                streak = 1
+        max_streak = max(max_streak, streak)
 
     return {
         "total_watched": len(watched),
@@ -560,4 +616,92 @@ async def get_user_stats(user_id: str) -> Dict:
         "avg_rating": avg_rating,
         "monthly_watched": months_data,
         "rating_distribution": rating_dist,
+        "top_genres": [{"genre": g, "count": c} for g, c in top_genres],
+        "current_streak": current_streak,
+        "max_streak": max_streak,
     }
+
+
+async def compare_users(user_id_a: str, user_id_b: str) -> Dict:
+    """Compara las puntuaciones de dos usuarios en películas que ambos han visto."""
+    lists_a = await get_user_lists(user_id_a)
+    lists_b = await get_user_lists(user_id_b)
+
+    watched_a = {i["tmdb_id"]: i for i in lists_a if i["list_type"] == "watched" and i.get("rating")}
+    watched_b = {i["tmdb_id"]: i for i in lists_b if i["list_type"] == "watched" and i.get("rating")}
+
+    common_ids = set(watched_a.keys()) & set(watched_b.keys())
+    common = []
+    total_diff = 0
+    agreements = 0
+
+    for tmdb_id in common_ids:
+        a = watched_a[tmdb_id]
+        b = watched_b[tmdb_id]
+        diff = abs((a.get("rating") or 0) - (b.get("rating") or 0))
+        total_diff += diff
+        if diff <= 1:
+            agreements += 1
+        common.append({
+            "tmdb_id": tmdb_id,
+            "movie_title": a.get("movie_title", ""),
+            "movie_poster": a.get("movie_poster"),
+            "movie_year": a.get("movie_year"),
+            "rating_a": a.get("rating"),
+            "rating_b": b.get("rating"),
+            "review_a": a.get("review"),
+            "review_b": b.get("review"),
+            "diff": diff,
+        })
+
+    # Sort by biggest disagreement first
+    common.sort(key=lambda x: -x["diff"])
+
+    compatibility = round((agreements / len(common)) * 100) if common else 0
+    avg_diff = round(total_diff / len(common), 1) if common else 0
+
+    # Unique to each user
+    only_a = len(set(watched_a.keys()) - set(watched_b.keys()))
+    only_b = len(set(watched_b.keys()) - set(watched_a.keys()))
+
+    return {
+        "common_count": len(common),
+        "compatibility": compatibility,
+        "avg_diff": avg_diff,
+        "common_movies": common[:20],  # limit to 20
+        "only_a": only_a,
+        "only_b": only_b,
+    }
+
+
+async def get_recent_reviews(limit: int = 20) -> List[Dict]:
+    """Obtiene las reseñas más recientes de todos los usuarios."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/user_lists?list_type=eq.watched&review=not.is.null"
+            f"&review=neq.&select=user_id,tmdb_id,movie_title,movie_poster,movie_year,rating,review,created_at"
+            f"&order=created_at.desc&limit={limit}",
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            return []
+
+        items = resp.json()
+
+        # Enrich with usernames
+        if items:
+            user_ids = list(set(i["user_id"] for i in items))
+            ids_str = ",".join(user_ids)
+            profiles_resp = await client.get(
+                f"{_REST_URL}/profiles?id=in.({ids_str})&select=id,username",
+                headers=_headers(),
+            )
+            profiles = {}
+            if profiles_resp.status_code == 200:
+                profiles = {p["id"]: p for p in profiles_resp.json()}
+
+            for item in items:
+                profile = profiles.get(item["user_id"], {})
+                item["username"] = profile.get("username", "???")
+
+        return items

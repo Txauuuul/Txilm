@@ -441,26 +441,35 @@ export default function Details() {
           </section>
         )}
 
-        {/* ───── friend ratings ───── */}
+        {/* ───── friend ratings & reviews ───── */}
         {friendRatings.length > 0 && (
           <section className="mt-6">
             <h2 className="text-base font-bold mb-3 flex items-center gap-2">
               <Star className="w-4 h-4 text-cine-gold" /> Puntuaciones de amigos
             </h2>
-            <div className="flex flex-wrap gap-3">
+            <div className="space-y-2">
               {friendRatings.map((r, i) => (
                 <Link
                   key={i}
                   to={`/profile/${r.user_id}`}
-                  className="flex items-center gap-2 bg-cine-card rounded-xl px-3 py-2 ring-1 ring-cine-border hover:ring-cine-accent/30 transition"
+                  className="flex items-start gap-2.5 bg-cine-card rounded-xl px-3 py-2.5 ring-1 ring-cine-border hover:ring-cine-accent/30 transition"
                 >
-                  <div className="w-7 h-7 rounded-full bg-cine-border flex items-center justify-center text-[10px] font-bold uppercase text-cine-accent">
+                  <div className="w-7 h-7 rounded-full bg-cine-border flex items-center justify-center text-[10px] font-bold uppercase text-cine-accent flex-shrink-0 mt-0.5">
                     {r.username?.charAt(0) || "?"}
                   </div>
-                  <span className="text-sm font-medium">{r.username}</span>
-                  <span className="text-cine-gold text-sm font-bold">
-                    {r.rating}/10
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{r.username}</span>
+                      <span className="text-cine-gold text-sm font-bold">
+                        {typeof r.rating === 'number' ? r.rating.toFixed(1) : r.rating}/10
+                      </span>
+                    </div>
+                    {r.review && (
+                      <p className="text-xs text-cine-muted mt-0.5 line-clamp-2 italic">
+                        "{r.review}"
+                      </p>
+                    )}
+                  </div>
                 </Link>
               ))}
             </div>
@@ -553,12 +562,23 @@ export default function Details() {
           movie={miniMovie}
           initialRating={getWatchedRating(movie.tmdb_id)}
           onClose={() => setShowRating(false)}
-          onConfirm={(rating) => {
+          onConfirm={(rating, review) => {
+            // Build genre_ids string from movie genres
+            const genreMap = {
+              "Acción": "28", "Animación": "16", "Aventura": "12", "Comedia": "35",
+              "Crimen": "80", "Documental": "99", "Drama": "18", "Fantasía": "14",
+              "Terror": "27", "Romance": "10749", "Sci-Fi": "878", "Suspense": "53",
+              "Ciencia ficción": "878", "Thriller": "53",
+            };
+            const genreIds = (movie.genres || [])
+              .map((g) => genreMap[g] || "")
+              .filter(Boolean)
+              .join(",");
+
             if (isWatched(movie.tmdb_id)) {
-              // Re-rate: update existing rating
-              useStore.getState().reRate(movie.tmdb_id, rating);
+              useStore.getState().reRate(movie.tmdb_id, rating, review);
             } else {
-              addToWatched(miniMovie, rating);
+              addToWatched(miniMovie, rating, review, genreIds || null);
             }
             setShowRating(false);
           }}

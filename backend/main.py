@@ -34,7 +34,8 @@ from app.social import (
     follow_user, unfollow_user, get_following, get_followers,
     get_follow_counts, get_custom_lists, create_custom_list,
     delete_custom_list, get_custom_list_items, add_to_custom_list,
-    remove_from_custom_list, get_user_stats,
+    remove_from_custom_list, get_user_stats, compare_users,
+    get_recent_reviews,
 )
 from app.tmdb_service import (
     search_movies,
@@ -472,10 +473,13 @@ class AddToListRequest(BaseModel):
     movie_title: str
     movie_poster: Optional[str] = None
     movie_year: Optional[str] = None
-    rating: Optional[int] = None
+    rating: Optional[float] = None
+    review: Optional[str] = None
+    genre_ids: Optional[str] = None
 
 class UpdateRatingRequest(BaseModel):
-    rating: int
+    rating: float
+    review: Optional[str] = None
 
 class ShareMovieRequest(BaseModel):
     to_user_id: str
@@ -571,6 +575,8 @@ async def add_to_list_endpoint(request: Request, body: AddToListRequest):
         movie_poster=body.movie_poster,
         movie_year=body.movie_year,
         rating=body.rating,
+        review=body.review,
+        genre_ids=body.genre_ids,
     )
 
     # Notificar a todos si el usuario puntuó una película
@@ -605,7 +611,7 @@ async def remove_from_list_endpoint(request: Request, tmdb_id: int, list_type: s
 async def update_rating_endpoint(request: Request, tmdb_id: int, body: UpdateRatingRequest):
     """Actualizar puntuación de una película vista."""
     user = await require_auth(request)
-    result = await update_rating(user["id"], tmdb_id, body.rating)
+    result = await update_rating(user["id"], tmdb_id, body.rating, body.review)
     return result
 
 
@@ -829,4 +835,26 @@ async def get_my_stats_endpoint(request: Request):
     """Obtener mis estadísticas."""
     user = await require_auth(request)
     return await get_user_stats(user["id"])
+
+
+# ══════════════════════════════════════════════════════════
+# COMPARAR GUSTOS
+# ══════════════════════════════════════════════════════════
+
+@app.get("/compare/{user_id}", tags=["Social"])
+async def compare_endpoint(request: Request, user_id: str):
+    """Comparar mis puntuaciones con las de otro usuario."""
+    user = await require_auth(request)
+    return await compare_users(user["id"], user_id)
+
+
+# ══════════════════════════════════════════════════════════
+# RESEÑAS RECIENTES
+# ══════════════════════════════════════════════════════════
+
+@app.get("/reviews", tags=["Social"])
+async def get_reviews_endpoint(request: Request, limit: int = Query(20, ge=1, le=50)):
+    """Obtener reseñas recientes de todos los usuarios."""
+    await require_auth(request)
+    return await get_recent_reviews(limit)
 

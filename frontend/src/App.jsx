@@ -11,6 +11,9 @@ import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import Social from "./pages/Social";
 import CustomLists from "./pages/CustomLists";
+import Collections from "./pages/Collections";
+import WhatToWatch from "./pages/WhatToWatch";
+import Compare from "./pages/Compare";
 import useAuthStore from "./store/useAuthStore";
 import { getMe, refreshToken as apiRefresh } from "./api/api";
 
@@ -60,6 +63,9 @@ export default function App() {
           <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           <Route path="/custom-lists" element={<ProtectedRoute><CustomLists /></ProtectedRoute>} />
+          <Route path="/collections" element={<ProtectedRoute><Collections /></ProtectedRoute>} />
+          <Route path="/what-to-watch" element={<ProtectedRoute><WhatToWatch /></ProtectedRoute>} />
+          <Route path="/compare" element={<ProtectedRoute><Compare /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

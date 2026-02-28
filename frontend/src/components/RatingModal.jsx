@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { X, Star } from "lucide-react";
 
-export default function RatingModal({ movie, onConfirm, onClose, initialRating = 0 }) {
+export default function RatingModal({ movie, onConfirm, onClose, initialRating = 0, initialReview = "" }) {
   const [rating, setRating] = useState(initialRating || 0);
+  const [review, setReview] = useState(initialReview || "");
 
   const handleConfirm = () => {
     if (rating < 0.5) return;
-    onConfirm(rating);
+    onConfirm(rating, review.trim() || null);
   };
 
   return (
@@ -72,6 +73,17 @@ export default function RatingModal({ movie, onConfirm, onClose, initialRating =
           <p className="text-2xl font-extrabold text-cine-gold">
             {rating > 0 ? `${rating.toFixed(1)}/10` : "—"}
           </p>
+
+          {/* Mini-review */}
+          <div>
+            <textarea
+              value={review}
+              onChange={(e) => setReview(e.target.value.slice(0, 280))}
+              placeholder="Mini-reseña (opcional, máx. 280 chars)"
+              className="w-full bg-cine-bg rounded-lg px-3 py-2 text-xs text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none resize-none h-16 placeholder:text-cine-muted/60"
+            />
+            <p className="text-[10px] text-cine-muted text-right mt-0.5">{review.length}/280</p>
+          </div>
 
           <button
             onClick={handleConfirm}
