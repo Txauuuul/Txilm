@@ -95,6 +95,11 @@ export default function Login() {
             Regístrate con código de invitación
           </Link>
         </p>
+        <p className="text-center text-xs text-cine-muted mt-2">
+          <Link to="/recover" className="text-cine-accent/70 hover:text-cine-accent hover:underline transition">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </p>
       </div>
     </div>
   );

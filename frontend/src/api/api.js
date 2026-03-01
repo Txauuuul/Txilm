@@ -345,6 +345,33 @@ export async function changePassword(oldPassword, newPassword) {
 }
 
 // ═══════════════════════════════════════════
+// Recuperación de contraseña (admin genera código)
+// ═══════════════════════════════════════════
+
+export async function generateResetCode(targetUsername, hoursValid = 24) {
+  const { data } = await http.post("/admin/reset-codes", {
+    target_username: targetUsername,
+    hours_valid: hoursValid,
+  });
+  return data;
+}
+
+export async function getResetCodes() {
+  const { data } = await http.get("/admin/reset-codes");
+  return data;
+}
+
+/** Resetear contraseña con código temporal (público, sin auth) */
+export async function resetPassword(username, code, newPassword) {
+  const { data } = await http.post("/auth/reset-password", {
+    username,
+    code,
+    new_password: newPassword,
+  });
+  return data;
+}
+
+// ═══════════════════════════════════════════
 // Sistema de seguimiento (follows)
 // ═══════════════════════════════════════════
 

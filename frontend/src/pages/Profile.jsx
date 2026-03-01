@@ -7,6 +7,7 @@ import {
   Eye,
   Shield,
   Key,
+  KeyRound,
   Copy,
   Check,
   LogOut,
@@ -28,6 +29,8 @@ import {
   unfollowUser,
   getFollowCounts,
   getFollowing,
+  generateResetCode,
+  getResetCodes,
 } from "../api/api";
 import useAuthStore from "../store/useAuthStore";
 
@@ -64,6 +67,13 @@ export default function Profile() {
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(null);
 
+  // Admin: reset codes
+  const [resetCodes, setResetCodes] = useState([]);
+  const [resetTarget, setResetTarget] = useState("");
+  const [resetHours, setResetHours] = useState(24);
+  const [generatingReset, setGeneratingReset] = useState(false);
+  const [resetMsg, setResetMsg] = useState(null);
+
   // Stats
   const [stats, setStats] = useState(null);
   const [showStats, setShowStats] = useState(false);
@@ -99,6 +109,7 @@ export default function Profile() {
   useEffect(() => {
     if (isMe && currentUser?.is_admin) {
       getInviteCodes().then(setCodes).catch(() => {});
+      getResetCodes().then(setResetCodes).catch(() => {});
     }
   }, [isMe, currentUser]);
 
@@ -139,6 +150,29 @@ export default function Profile() {
     navigator.clipboard.writeText(code);
     setCopied(code);
     setTimeout(() => setCopied(null), 2000);
+  };
+
+  const handleGenerateReset = async () => {
+    if (!resetTarget.trim()) {
+      setResetMsg({ type: "error", text: "Introduce un nombre de usuario" });
+      return;
+    }
+    setGeneratingReset(true);
+    setResetMsg(null);
+    try {
+      const result = await generateResetCode(resetTarget.trim(), resetHours);
+      setResetMsg({ type: "ok", text: `Código generado: ${result.code}` });
+      setResetTarget("");
+      const all = await getResetCodes();
+      setResetCodes(all);
+    } catch (err) {
+      setResetMsg({
+        type: "error",
+        text: err.response?.data?.detail || "Error al generar código",
+      });
+    } finally {
+      setGeneratingReset(false);
+    }
   };
 
   const handleFollow = async () => {
@@ -595,6 +629,101 @@ export default function Profile() {
                 )}
               </div>
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Admin: Password reset codes */}
+      {isMe && currentUser?.is_admin && (
+        <section className="max-w-4xl mx-auto px-4 mt-8 pb-8">
+          <h2 className="text-base font-bold mb-3 flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-cine-accent" /> Códigos de recuperación
+          </h2>
+
+          {/* Generate reset code */}
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <input
+              type="text"
+              value={resetTarget}
+              onChange={(e) => setResetTarget(e.target.value)}
+              placeholder="Nombre de usuario"
+              className="flex-1 min-w-[140px] px-3 py-1.5 bg-cine-card rounded-lg text-sm text-white placeholder-cine-muted ring-1 ring-cine-border focus:ring-cine-accent focus:outline-none"
+            />
+            <select
+              value={resetHours}
+              onChange={(e) => setResetHours(Number(e.target.value))}
+              className="px-2 py-1.5 bg-cine-card rounded-lg text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent focus:outline-none"
+            >
+              <option value={1}>1h</option>
+              <option value={6}>6h</option>
+              <option value={24}>24h</option>
+              <option value={48}>48h</option>
+              <option value={72}>72h</option>
+            </select>
+            <button
+              onClick={handleGenerateReset}
+              disabled={generatingReset}
+              className="px-4 py-1.5 bg-cine-accent text-white rounded-lg text-sm font-medium hover:bg-cine-accent/90 transition disabled:opacity-50 whitespace-nowrap"
+            >
+              {generatingReset ? "Generando…" : "Generar código"}
+            </button>
+          </div>
+
+          {resetMsg && (
+            <p
+              className={`text-xs mb-3 ${
+                resetMsg.type === "ok" ? "text-cine-green" : "text-cine-accent"
+              }`}
+            >
+              {resetMsg.text}
+            </p>
+          )}
+
+          {/* Reset codes list */}
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {resetCodes.map((rc) => {
+              const expired = new Date(rc.expires_at) < new Date();
+              const used = !!rc.used_at;
+              const statusText = used
+                ? "Usado"
+                : expired
+                ? "Expirado"
+                : `Válido ${new Date(rc.expires_at).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}`;
+              const inactive = used || expired;
+
+              return (
+                <div
+                  key={rc.id}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ring-1 ${
+                    inactive
+                      ? "ring-cine-border/50 text-cine-muted"
+                      : "ring-cine-border text-white"
+                  }`}
+                >
+                  <code className="font-mono tracking-wider">{rc.code}</code>
+                  <span className="text-cine-muted">→ {rc.target_user}</span>
+                  <span className="flex-1" />
+                  <span className={`text-[10px] ${
+                    inactive ? "text-cine-muted" : "text-cine-green"
+                  }`}>
+                    {statusText}
+                  </span>
+                  {!inactive && (
+                    <button
+                      onClick={() => copyCode(rc.code)}
+                      className="p-1 text-cine-muted hover:text-cine-accent transition"
+                      title="Copiar"
+                    >
+                      {copied === rc.code ? (
+                        <Check className="w-3.5 h-3.5 text-cine-green" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </section>
       )}

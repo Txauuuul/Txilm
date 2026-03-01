@@ -7,6 +7,7 @@ import Details from "./pages/Details";
 import Lists from "./pages/Lists";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import RecoverPassword from "./pages/RecoverPassword";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import Social from "./pages/Social";
@@ -57,6 +58,7 @@ export default function App() {
           {/* Public */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/recover" element={<RecoverPassword />} />
 
           {/* Protected */}
           <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />

@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
 
 from app.config import TMDB_API_KEY, OMDB_API_KEY, SUPABASE_URL
-from app.auth import register_user, login_user, refresh_session, require_auth, require_admin, change_password
+from app.auth import register_user, login_user, refresh_session, require_auth, require_admin, change_password, generate_reset_code, get_reset_codes, reset_password_with_code
 from app.social import (
     get_user_lists, add_to_list, remove_from_list, update_rating,
     get_movie_ratings, share_movie, get_notifications, get_unread_count,
@@ -499,6 +499,15 @@ class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
 
+class GenerateResetCodeRequest(BaseModel):
+    target_username: str
+    hours_valid: int = 24
+
+class ResetPasswordRequest(BaseModel):
+    username: str
+    code: str
+    new_password: str
+
 class CreateCustomListRequest(BaseModel):
     name: str
     description: Optional[str] = None
@@ -549,6 +558,28 @@ async def auth_change_password(request: Request, body: ChangePasswordRequest):
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+
+# ── Password Reset Endpoints ──
+
+@app.post("/admin/reset-codes", tags=["Admin"])
+async def generate_reset_code_endpoint(request: Request, body: GenerateResetCodeRequest):
+    """Generar código de recuperación para un usuario (solo admin)."""
+    admin = await require_admin(request)
+    return await generate_reset_code(body.target_username, admin["id"], body.hours_valid)
+
+
+@app.get("/admin/reset-codes", tags=["Admin"])
+async def get_reset_codes_endpoint(request: Request):
+    """Ver todos los códigos de recuperación (solo admin)."""
+    await require_admin(request)
+    return await get_reset_codes()
+
+
+@app.post("/auth/reset-password", tags=["Auth"])
+async def reset_password_endpoint(body: ResetPasswordRequest):
+    """Resetear contraseña con código temporal (público)."""
+    return await reset_password_with_code(body.username, body.code, body.new_password)
 
 
 # ── User Lists Endpoints ──

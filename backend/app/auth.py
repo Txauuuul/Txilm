@@ -7,8 +7,9 @@ Internamente usa email ficticio: username@txilms.app
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
+import secrets
+from datetime import datetime, timezone, timedelta
+from typing import Optional, Dict, Any, List
 
 import httpx
 from fastapi import Request, HTTPException
@@ -267,6 +268,113 @@ async def require_admin(request: Request) -> Dict[str, Any]:
     if not user.get("is_admin"):
         raise HTTPException(status_code=403, detail="No tienes permisos de administrador")
     return user
+
+
+async def generate_reset_code(target_username: str, admin_user_id: str, hours_valid: int = 24) -> Dict[str, Any]:
+    """Genera un código temporal para que un usuario pueda resetear su contraseña."""
+    target_username = target_username.strip().lower()
+
+    # Verificar que el usuario existe
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/profiles?username=eq.{target_username}&select=id,username",
+            headers=_admin_headers(),
+        )
+        profiles = resp.json()
+        if not profiles:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Generar código aleatorio de 8 caracteres (letras+números, fácil de copiar)
+    code = secrets.token_hex(4).upper()  # e.g. "A3F2B1C9"
+
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=hours_valid)).isoformat()
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(
+            f"{_REST_URL}/password_reset_codes",
+            headers=_admin_headers(prefer="return=representation"),
+            json={
+                "code": code,
+                "target_user": target_username,
+                "created_by": admin_user_id,
+                "expires_at": expires_at,
+            },
+        )
+        if resp.status_code not in (200, 201):
+            logger.error(f"Error creando reset code: {resp.text}")
+            raise HTTPException(status_code=500, detail="Error al crear código de recuperación")
+
+    return {
+        "code": code,
+        "target_user": target_username,
+        "expires_at": expires_at,
+    }
+
+
+async def get_reset_codes() -> List[Dict[str, Any]]:
+    """Obtiene todos los códigos de recuperación (para admin)."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/password_reset_codes?select=*&order=created_at.desc",
+            headers=_admin_headers(),
+        )
+        return resp.json() if resp.status_code == 200 else []
+
+
+async def reset_password_with_code(username: str, code: str, new_password: str) -> Dict[str, Any]:
+    """Resetea la contraseña usando un código temporal válido."""
+    username = username.strip().lower()
+    code = code.strip().upper()
+
+    if len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 4 caracteres")
+
+    # 1. Buscar código válido (no usado, no expirado, para ese usuario)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/password_reset_codes"
+            f"?code=eq.{code}&target_user=eq.{username}&used_at=is.null"
+            f"&expires_at=gt.{now_iso}&select=id",
+            headers=_admin_headers(),
+        )
+        codes = resp.json()
+        if not codes:
+            raise HTTPException(status_code=400, detail="Código inválido, expirado o ya usado")
+
+        reset_id = codes[0]["id"]
+
+    # 2. Buscar user_id del usuario
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(
+            f"{_REST_URL}/profiles?username=eq.{username}&select=id",
+            headers=_admin_headers(),
+        )
+        profiles = resp.json()
+        if not profiles:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        user_id = profiles[0]["id"]
+
+    # 3. Cambiar contraseña via admin API
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.put(
+            f"{_AUTH_URL}/admin/users/{user_id}",
+            headers=_admin_headers(),
+            json={"password": new_password},
+        )
+        if resp.status_code != 200:
+            logger.error(f"Error resetting password: {resp.text}")
+            raise HTTPException(status_code=500, detail="Error al cambiar la contraseña")
+
+    # 4. Marcar código como usado
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        await client.patch(
+            f"{_REST_URL}/password_reset_codes?id=eq.{reset_id}",
+            headers=_admin_headers(),
+            json={"used_at": datetime.now(timezone.utc).isoformat()},
+        )
+
+    return {"ok": True, "message": "Contraseña restablecida correctamente"}
 
 
 async def change_password(user_id: str, old_password: str, new_password: str, username: str) -> Dict[str, Any]:
