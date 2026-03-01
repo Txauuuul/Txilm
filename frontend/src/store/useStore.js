@@ -2,6 +2,11 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import * as api from "../api/api";
 
+/** Extrae mensaje de error legible de la respuesta */
+function getErrorMsg(err, fallback = "Error al guardar") {
+  return err?.response?.data?.detail || err?.message || fallback;
+}
+
 const useStore = create(
   persist(
     (set, get) => ({
@@ -50,7 +55,9 @@ const useStore = create(
             movie_poster: movie.poster,
             movie_year: movie.year,
           });
-        } catch {
+        } catch (err) {
+          console.error("Error addFavorite:", err);
+          alert(getErrorMsg(err, "Error al añadir a favoritos"));
           set((s) => ({
             favorites: s.favorites.filter((m) => m.tmdb_id !== movie.tmdb_id),
           }));
@@ -61,7 +68,9 @@ const useStore = create(
         set((s) => ({ favorites: s.favorites.filter((m) => m.tmdb_id !== id) }));
         try {
           await api.removeFromList(id, "favorite");
-        } catch {
+        } catch (err) {
+          console.error("Error removeFavorite:", err);
+          alert(getErrorMsg(err, "Error al quitar de favoritos"));
           set({ favorites: prev });
         }
       },
@@ -89,7 +98,9 @@ const useStore = create(
             movie_poster: movie.poster,
             movie_year: movie.year,
           });
-        } catch {
+        } catch (err) {
+          console.error("Error addToWatchlist:", err);
+          alert(getErrorMsg(err, "Error al añadir a pendientes"));
           set((s) => ({
             watchlist: s.watchlist.filter((m) => m.tmdb_id !== movie.tmdb_id),
           }));
@@ -100,7 +111,9 @@ const useStore = create(
         set((s) => ({ watchlist: s.watchlist.filter((m) => m.tmdb_id !== id) }));
         try {
           await api.removeFromList(id, "watchlist");
-        } catch {
+        } catch (err) {
+          console.error("Error removeFromWatchlist:", err);
+          alert(getErrorMsg(err, "Error al quitar de pendientes"));
           set({ watchlist: prev });
         }
       },
@@ -131,7 +144,9 @@ const useStore = create(
             review,
             genre_ids: genreIds,
           });
-        } catch {
+        } catch (err) {
+          console.error("Error addToWatched:", err);
+          alert(getErrorMsg(err, "Error al marcar como vista"));
           set((s) => ({
             watched: s.watched.filter((m) => m.tmdb_id !== movie.tmdb_id),
           }));
@@ -142,7 +157,9 @@ const useStore = create(
         set((s) => ({ watched: s.watched.filter((m) => m.tmdb_id !== id) }));
         try {
           await api.removeFromList(id, "watched");
-        } catch {
+        } catch (err) {
+          console.error("Error removeFromWatched:", err);
+          alert(getErrorMsg(err, "Error al quitar de vistas"));
           set({ watched: prev });
         }
       },
@@ -160,7 +177,9 @@ const useStore = create(
         }));
         try {
           await api.updateRating(tmdbId, newRating, review);
-        } catch {
+        } catch (err) {
+          console.error("Error reRate:", err);
+          alert(getErrorMsg(err, "Error al actualizar la puntuación"));
           set({ watched: prev });
         }
       },

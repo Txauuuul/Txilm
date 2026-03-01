@@ -11,6 +11,7 @@ import string
 from typing import Dict, Any, List, Optional
 
 import httpx
+from fastapi import HTTPException
 
 from app.config import SUPABASE_URL, SUPABASE_KEY
 
@@ -46,7 +47,7 @@ async def get_user_lists(user_id: str, list_type: Optional[str] = None) -> List[
 async def add_to_list(
     user_id: str, tmdb_id: int, list_type: str,
     movie_title: str, movie_poster: str = None,
-    movie_year: str = None, rating: int = None,
+    movie_year: str = None, rating: float = None,
     review: str = None, genre_ids: str = None,
 ) -> Dict:
     """Añade una película a la lista de un usuario."""
@@ -73,7 +74,13 @@ async def add_to_list(
         )
         if resp.status_code in (200, 201):
             data = resp.json()
-            return data[0] if isinstance(data, list) else data
+            if isinstance(data, list) and len(data) > 0:
+                return data[0]
+            elif isinstance(data, dict) and data:
+                return data
+            # RLS puede bloquear silenciosamente (201 con cuerpo vacío)
+            logger.warning(f"Insert user_lists devolvió vacío (posible RLS). user={user_id} status={resp.status_code} body={resp.text}")
+            raise HTTPException(status_code=500, detail="Error al guardar en la lista. Contacta al admin.")
 
         # Si ya existe (UNIQUE constraint), actualizar
         if resp.status_code == 409:
@@ -82,11 +89,14 @@ async def add_to_list(
                 headers=_headers(prefer="return=representation"),
                 json=body,
             )
+            if resp2.status_code not in (200, 204):
+                logger.error(f"Error actualizando lista (upsert): {resp2.status_code} {resp2.text}")
+                raise HTTPException(status_code=500, detail="Error al actualizar en la lista")
             data = resp2.json()
             return data[0] if isinstance(data, list) and data else {}
 
         logger.error(f"Error añadiendo a lista: {resp.status_code} {resp.text}")
-        return {}
+        raise HTTPException(status_code=500, detail=f"Error al guardar película en la lista ({resp.status_code})")
 
 
 async def remove_from_list(user_id: str, tmdb_id: int, list_type: str) -> bool:
@@ -99,7 +109,7 @@ async def remove_from_list(user_id: str, tmdb_id: int, list_type: str) -> bool:
         return resp.status_code in (200, 204)
 
 
-async def update_rating(user_id: str, tmdb_id: int, rating: int, review: str = None) -> Dict:
+async def update_rating(user_id: str, tmdb_id: int, rating: float, review: str = None) -> Dict:
     """Actualiza la puntuación y/o reseña de una película vista."""
     body = {"rating": rating}
     if review is not None:
@@ -110,8 +120,13 @@ async def update_rating(user_id: str, tmdb_id: int, rating: int, review: str = N
             headers=_headers(prefer="return=representation"),
             json=body,
         )
+        if resp.status_code not in (200, 204):
+            logger.error(f"Error actualizando rating: {resp.status_code} {resp.text}")
+            raise HTTPException(status_code=500, detail="Error al actualizar la puntuación")
         data = resp.json()
-        return data[0] if isinstance(data, list) and data else {}
+        if isinstance(data, list) and data:
+            return data[0]
+        return {}
 
 
 async def get_movie_ratings(tmdb_id: int) -> List[Dict]:
@@ -378,7 +393,7 @@ async def get_all_codes() -> List[Dict]:
 async def follow_user(follower_id: str, following_id: str) -> Dict:
     """Seguir a un usuario."""
     if follower_id == following_id:
-        return {"error": "No puedes seguirte a ti mismo"}
+        raise HTTPException(status_code=400, detail="No puedes seguirte a ti mismo")
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(
@@ -389,7 +404,10 @@ async def follow_user(follower_id: str, following_id: str) -> Dict:
         if resp.status_code in (200, 201):
             d = resp.json()
             return d[0] if isinstance(d, list) else d
-        return {}
+        if resp.status_code == 409:
+            return {"ok": True, "message": "Ya sigues a este usuario"}
+        logger.error(f"Error al seguir usuario: {resp.status_code} {resp.text}")
+        raise HTTPException(status_code=500, detail="Error al seguir al usuario")
 
 
 async def unfollow_user(follower_id: str, following_id: str) -> bool:
@@ -459,8 +477,14 @@ async def create_custom_list(user_id: str, name: str, description: str = None) -
         )
         if resp.status_code in (200, 201):
             d = resp.json()
-            return d[0] if isinstance(d, list) else d
-        return {}
+            if isinstance(d, list) and d:
+                return d[0]
+            elif isinstance(d, dict) and d:
+                return d
+            logger.warning(f"create_custom_list vacío: user={user_id} status={resp.status_code}")
+            raise HTTPException(status_code=500, detail="Error al crear la lista")
+        logger.error(f"Error creando lista personalizada: {resp.status_code} {resp.text}")
+        raise HTTPException(status_code=500, detail="Error al crear la lista personalizada")
 
 
 async def delete_custom_list(list_id: int, user_id: str) -> bool:
@@ -508,8 +532,14 @@ async def add_to_custom_list(
         )
         if resp.status_code in (200, 201):
             d = resp.json()
-            return d[0] if isinstance(d, list) else d
-        return {}
+            if isinstance(d, list) and d:
+                return d[0]
+            elif isinstance(d, dict) and d:
+                return d
+            logger.warning(f"add_to_custom_list vacío: list={list_id} status={resp.status_code}")
+            raise HTTPException(status_code=500, detail="Error al añadir película a la lista")
+        logger.error(f"Error añadiendo a lista personalizada: {resp.status_code} {resp.text}")
+        raise HTTPException(status_code=500, detail="Error al añadir a la lista personalizada")
 
 
 async def remove_from_custom_list(list_id: int, tmdb_id: int) -> bool:
