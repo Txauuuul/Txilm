@@ -16,7 +16,7 @@ import {
   Brain,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { discoverMovies } from "../api/api";
+import { discoverMovies, getMovieDetail } from "../api/api";
 
 const TMDB_IMG = "https://image.tmdb.org/t/p";
 
@@ -67,6 +67,7 @@ export default function WhatToWatch() {
   const [decade, setDecade] = useState(null);
   const [ratingLevel, setRatingLevel] = useState(null);
   const [result, setResult] = useState(null);
+  const [faMinRating, setFaMinRating] = useState("");
   const [loading, setLoading] = useState(false);
   const [spinning, setSpinning] = useState(false);
 
@@ -123,9 +124,26 @@ export default function WhatToWatch() {
         items = Array.isArray(fallback) ? fallback : fallback.results || [];
       }
 
-      if (items.length > 0) {
-        const randomIdx = Math.floor(Math.random() * items.length);
-        setResult(items[randomIdx]);
+      // shuffle items
+      items.sort(() => Math.random() - 0.5);
+
+      const faMin = parseFloat(faMinRating);
+      if (faMin > 0 && items.length > 0) {
+        // Check FA score for candidates (max 10 to avoid too many calls)
+        let found = null;
+        for (const m of items.slice(0, 10)) {
+          try {
+            const detail = await getMovieDetail(m.tmdb_id, "ES");
+            const faScore = parseFloat(detail?.scores?.filmaffinity?.score);
+            if (!isNaN(faScore) && faScore >= faMin) {
+              found = { ...m, faScore };
+              break;
+            }
+          } catch { /* skip */ }
+        }
+        if (found) setResult(found);
+      } else if (items.length > 0) {
+        setResult(items[0]);
       }
     } catch {
       setResult(null);
@@ -143,6 +161,7 @@ export default function WhatToWatch() {
     setPlatforms([]);
     setDecade(null);
     setRatingLevel(null);
+    setFaMinRating("");
     setResult(null);
   };
 
@@ -317,6 +336,39 @@ export default function WhatToWatch() {
                 </button>
               ))}
             </div>
+
+            {/* FA minimum filter */}
+            <div className="mt-3 bg-cine-card/50 rounded-xl ring-1 ring-cine-border p-3">
+              <label className="text-[11px] text-cine-muted mb-1.5 flex items-center gap-1">
+                🎬 Nota mínima en FilmAffinity <span className="text-[9px] text-cine-muted/60">(opcional)</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  step="0.1"
+                  value={faMinRating}
+                  onChange={(e) => setFaMinRating(e.target.value)}
+                  placeholder="Ej: 6.5"
+                  className="w-24 px-2.5 py-1.5 bg-cine-bg rounded-lg ring-1 ring-cine-border text-sm text-white placeholder:text-cine-muted/50 focus:ring-cine-accent outline-none"
+                />
+                <span className="text-xs text-cine-muted">/ 10</span>
+                {faMinRating && (
+                  <button
+                    onClick={() => setFaMinRating("")}
+                    className="text-[10px] text-cine-accent hover:text-cine-accent/80 transition"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+              {faMinRating && parseFloat(faMinRating) > 0 && (
+                <p className="text-[10px] text-cine-muted/70 mt-1">
+                  Solo se mostrarán películas con ≥ {parseFloat(faMinRating).toFixed(1)} en FA (puede tardar un poco más)
+                </p>
+              )}
+            </div>
           </div>
         )}
 
@@ -381,9 +433,14 @@ export default function WhatToWatch() {
                       {result.year}
                     </p>
                   )}
+                  {result.faScore > 0 && (
+                    <p className="text-cine-blue text-sm font-bold mt-1">
+                      🎬 FA: {result.faScore.toFixed(1)}/10
+                    </p>
+                  )}
                   {result.vote_average > 0 && (
                     <p className="text-cine-gold text-sm font-bold mt-1">
-                      ⭐ {result.vote_average?.toFixed(1)}/10
+                      ⭐ TMDB: {result.vote_average?.toFixed(1)}/10
                     </p>
                   )}
                   {result.overview && (

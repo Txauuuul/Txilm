@@ -322,6 +322,17 @@ export default function Details() {
         {/* ───── scores ───── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 overflow-hidden">
           <ScoreCard
+            emoji="🎬"
+            label="FilmAffinity"
+            value={scores.filmaffinity?.score}
+            subtitle={
+              scores.filmaffinity?.votes
+                ? `${scores.filmaffinity.votes} votos`
+                : null
+            }
+            color="text-cine-blue"
+          />
+          <ScoreCard
             emoji="⭐"
             label="IMDb"
             value={scores.imdb?.score}
@@ -337,17 +348,6 @@ export default function Details() {
                 ? "text-cine-green"
                 : "text-cine-accent"
             }
-          />
-          <ScoreCard
-            emoji="🎬"
-            label="FilmAffinity"
-            value={scores.filmaffinity?.score}
-            subtitle={
-              scores.filmaffinity?.votes
-                ? `${scores.filmaffinity.votes} votos`
-                : null
-            }
-            color="text-cine-blue"
           />
           <ScoreCard
             emoji="Ⓜ️"

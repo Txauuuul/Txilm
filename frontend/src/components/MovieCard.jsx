@@ -4,6 +4,7 @@ const NO_POSTER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' 
 
 export default function MovieCard({ movie, size = "md" }) {
   const w = size === "full" ? "w-full" : size === "lg" ? "w-44" : size === "sm" ? "w-28" : "w-36";
+  const score = movie.vote_average;
 
   return (
     <Link
@@ -19,6 +20,15 @@ export default function MovieCard({ movie, size = "md" }) {
         />
         {/* Overlay degradado */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* Score badge */}
+        {score > 0 && (
+          <div className="absolute top-1.5 right-1.5 bg-black/70 backdrop-blur-sm rounded-lg px-1.5 py-0.5 flex items-center gap-0.5 ring-1 ring-white/10">
+            <span className="text-[10px]">⭐</span>
+            <span className="text-[11px] font-bold text-cine-gold">
+              {typeof score === "number" ? score.toFixed(1) : score}
+            </span>
+          </div>
+        )}
       </div>
 
       <h3 className="mt-2 text-sm font-semibold leading-tight line-clamp-2 text-white/90 group-hover:text-white transition-colors">

@@ -20,6 +20,8 @@ import {
   Palette,
   PenLine,
   Film,
+  Camera,
+  Trash2,
 } from "lucide-react";
 import {
   getProfile,
@@ -130,6 +132,7 @@ export default function Profile() {
   const [bio, setBio] = useState("");
   const [avatarColor, setAvatarColor] = useState("bg-cine-card");
   const [favGenre, setFavGenre] = useState("");
+  const [profileImage, setProfileImage] = useState(null);
   const [settingsSaved, setSettingsSaved] = useState(false);
 
   // Load profile settings
@@ -140,8 +143,24 @@ export default function Profile() {
       setBio(settings.bio || "");
       setAvatarColor(settings.avatarColor || "bg-cine-card");
       setFavGenre(settings.favGenre || "");
+      setProfileImage(settings.profileImage || null);
     }
   }, [targetId]);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      alert("La imagen no puede superar los 500KB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+      setProfileImage(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     if (!targetId) return;
@@ -293,9 +312,17 @@ export default function Profile() {
       <section className="px-4 pt-6 md:pt-10 pb-4">
         <div className="max-w-4xl mx-auto text-center">
           {/* avatar */}
-          <div className={`w-20 h-20 rounded-full ${avatarColor} ring-2 ring-cine-border mx-auto flex items-center justify-center text-2xl font-bold uppercase text-white`}>
-            {profile.username?.charAt(0) || "?"}
-          </div>
+          {profileImage ? (
+            <img
+              src={profileImage}
+              alt={profile.username}
+              className="w-20 h-20 rounded-full ring-2 ring-cine-border mx-auto object-cover"
+            />
+          ) : (
+            <div className={`w-20 h-20 rounded-full ${avatarColor} ring-2 ring-cine-border mx-auto flex items-center justify-center text-2xl font-bold uppercase text-white`}>
+              {profile.username?.charAt(0) || "?"}
+            </div>
+          )}
           <h1 className="text-xl font-extrabold mt-3">{profile.username}</h1>
           {/* Bio */}
           {bio && (
@@ -467,10 +494,50 @@ export default function Profile() {
               <Settings className="w-4 h-4 text-cine-accent" /> Personalizar perfil
             </h3>
 
-            {/* Avatar color */}
+            {/* Profile image */}
             <div className="mb-4">
               <label className="text-[11px] text-cine-muted block mb-2 flex items-center gap-1">
-                <Palette className="w-3 h-3" /> Color del avatar
+                <Camera className="w-3 h-3" /> Foto de perfil
+              </label>
+              <div className="flex items-center gap-3">
+                {profileImage ? (
+                  <img
+                    src={profileImage}
+                    alt="Preview"
+                    className="w-14 h-14 rounded-full object-cover ring-2 ring-cine-border"
+                  />
+                ) : (
+                  <div className={`w-14 h-14 rounded-full ${avatarColor} ring-2 ring-cine-border flex items-center justify-center text-lg font-bold text-white`}>
+                    {profile?.username?.charAt(0) || "?"}
+                  </div>
+                )}
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <label className="cursor-pointer px-3 py-1.5 bg-cine-bg rounded-lg text-xs text-white ring-1 ring-cine-border hover:ring-cine-accent transition text-center">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    {profileImage ? "Cambiar imagen" : "Subir imagen"}
+                  </label>
+                  {profileImage && (
+                    <button
+                      onClick={() => setProfileImage(null)}
+                      className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+                    >
+                      <Trash2 className="w-3 h-3" /> Quitar foto
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="text-[10px] text-cine-muted mt-1">Máx. 500KB · PNG, JPG o WebP</p>
+            </div>
+
+            {/* Avatar color (when no image) */}
+            <div className="mb-4">
+              <label className="text-[11px] text-cine-muted block mb-2 flex items-center gap-1">
+                <Palette className="w-3 h-3" /> Color del avatar {profileImage && "(oculto si hay foto)"}
               </label>
               <div className="flex flex-wrap gap-2">
                 {AVATAR_COLORS.map((c) => (
@@ -530,7 +597,7 @@ export default function Profile() {
 
             <button
               onClick={() => {
-                saveProfileSettings(targetId, { bio, avatarColor, favGenre });
+                saveProfileSettings(targetId, { bio, avatarColor, favGenre, profileImage });
                 setSettingsSaved(true);
                 setTimeout(() => setSettingsSaved(false), 2000);
               }}
