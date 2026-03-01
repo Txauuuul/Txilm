@@ -211,7 +211,7 @@ async def discover_movies(
     with_watch_providers: str = None,
     watch_region: str = None,
     page: int = 1,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Descubre películas por criterios: género, puntuación mínima, plataformas, etc.
     Ideal para secciones como 'Mejores de animación', 'Mejores de suspense', etc.
@@ -245,7 +245,12 @@ async def discover_movies(
             "backdrop": _backdrop_url(item.get("backdrop_path")),
         })
 
-    return results
+    return {
+        "page": data.get("page", 1),
+        "total_pages": data.get("total_pages", 1),
+        "total_results": data.get("total_results", 0),
+        "results": results,
+    }
 
 
 # ── Top Rated ─────────────────────────────────────────────

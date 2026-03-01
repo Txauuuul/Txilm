@@ -1,13 +1,20 @@
 import { useState } from "react";
-import { X, Star } from "lucide-react";
+import { X, Star, Minus, Plus } from "lucide-react";
 
 export default function RatingModal({ movie, onConfirm, onClose, initialRating = 0, initialReview = "" }) {
   const [rating, setRating] = useState(initialRating || 0);
   const [review, setReview] = useState(initialReview || "");
 
   const handleConfirm = () => {
-    if (rating < 0.5) return;
+    if (rating < 0.1) return;
     onConfirm(rating, review.trim() || null);
+  };
+
+  const adjustRating = (delta) => {
+    setRating((prev) => {
+      const next = Math.round((prev + delta) * 10) / 10;
+      return Math.max(0, Math.min(10, next));
+    });
   };
 
   return (
@@ -30,15 +37,15 @@ export default function RatingModal({ movie, onConfirm, onClose, initialRating =
             <span className="text-white font-semibold">{movie.title}</span>?
           </p>
 
-          {/* Star visual display */}
+          {/* Star visual display - click sets whole number */}
           <div className="flex justify-center gap-0.5">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
               const filled = rating >= n;
-              const halfFilled = !filled && rating >= n - 0.5;
+              const partialFill = !filled && rating > n - 1;
               return (
                 <button
                   key={n}
-                  onClick={() => setRating(rating === n ? n - 0.5 : n)}
+                  onClick={() => setRating(n)}
                   className="p-0.5 transition"
                   title={`${n}`}
                 >
@@ -46,7 +53,7 @@ export default function RatingModal({ movie, onConfirm, onClose, initialRating =
                     className={`w-6 h-6 transition ${
                       filled
                         ? "text-cine-gold fill-cine-gold"
-                        : halfFilled
+                        : partialFill
                         ? "text-cine-gold fill-cine-gold/50"
                         : "text-cine-border"
                     }`}
@@ -56,23 +63,39 @@ export default function RatingModal({ movie, onConfirm, onClose, initialRating =
             })}
           </div>
 
-          {/* Decimal slider */}
+          {/* Decimal slider - step 0.1 */}
           <div>
             <input
               type="range"
               min="0"
               max="10"
-              step="0.5"
+              step="0.1"
               value={rating}
               onChange={(e) => setRating(Number(e.target.value))}
               className="w-full accent-cine-gold"
             />
           </div>
 
-          {/* Numeric display */}
-          <p className="text-2xl font-extrabold text-cine-gold">
-            {rating > 0 ? `${rating.toFixed(1)}/10` : "—"}
-          </p>
+          {/* Fine-tune buttons + numeric display */}
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => adjustRating(-0.1)}
+              disabled={rating <= 0}
+              className="w-8 h-8 rounded-full bg-cine-bg ring-1 ring-cine-border flex items-center justify-center text-cine-muted hover:text-white hover:ring-cine-accent transition disabled:opacity-30"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <p className="text-2xl font-extrabold text-cine-gold min-w-[80px]">
+              {rating > 0 ? `${rating.toFixed(1)}/10` : "—"}
+            </p>
+            <button
+              onClick={() => adjustRating(0.1)}
+              disabled={rating >= 10}
+              className="w-8 h-8 rounded-full bg-cine-bg ring-1 ring-cine-border flex items-center justify-center text-cine-muted hover:text-white hover:ring-cine-accent transition disabled:opacity-30"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
 
           {/* Mini-review */}
           <div>
@@ -87,7 +110,7 @@ export default function RatingModal({ movie, onConfirm, onClose, initialRating =
 
           <button
             onClick={handleConfirm}
-            disabled={rating < 0.5}
+            disabled={rating < 0.1}
             className="w-full py-2.5 bg-cine-green text-white rounded-xl text-sm font-semibold hover:bg-cine-green/90 transition disabled:opacity-40"
           >
             Confirmar

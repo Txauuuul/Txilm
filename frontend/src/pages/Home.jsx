@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X, ChevronDown, Clock, SlidersHorizontal, Filter } from "lucide-react";
+import { Search, X, ChevronDown, Clock, SlidersHorizontal, Filter, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   searchMovies,
@@ -136,6 +136,16 @@ export default function Home() {
   const [filterLoading, setFilterLoading] = useState(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
 
+  // Search pagination
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchTotalPages, setSearchTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Filter pagination
+  const [filterPage, setFilterPage] = useState(1);
+  const [filterTotalPages, setFilterTotalPages] = useState(1);
+  const [filterLoadingMore, setFilterLoadingMore] = useState(false);
+
   // Search history
   const [searchHistory, setSearchHistory] = useState(getSearchHistory());
   const [showHistory, setShowHistory] = useState(false);
@@ -162,9 +172,12 @@ export default function Home() {
     getActivity(15).then(setActivity).catch(() => {});
     if (!listsLoaded) fetchLists();
 
+    // Random page for genre categories (1-10) to rotate content
+    const randomPage = () => Math.floor(Math.random() * 10) + 1;
+
     // Top rated
     setTopRatedLoading(true);
-    getTopRated(1)
+    getTopRated(randomPage())
       .then((data) => setTopRated(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setTopRatedLoading(false));
@@ -175,6 +188,7 @@ export default function Home() {
       withGenres: "16",
       sortBy: "vote_average.desc",
       voteCountGte: 500,
+      page: randomPage(),
     })
       .then((data) => setAnimation(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
@@ -186,6 +200,7 @@ export default function Home() {
       withGenres: "53",
       sortBy: "vote_average.desc",
       voteCountGte: 500,
+      page: randomPage(),
     })
       .then((data) => setSuspense(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
@@ -193,35 +208,35 @@ export default function Home() {
 
     // Comedy (genre 35)
     setComedyLoading(true);
-    discoverMovies({ withGenres: "35", sortBy: "vote_average.desc", voteCountGte: 500 })
+    discoverMovies({ withGenres: "35", sortBy: "vote_average.desc", voteCountGte: 500, page: randomPage() })
       .then((data) => setComedy(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setComedyLoading(false));
 
     // Action (genre 28)
     setActionLoading(true);
-    discoverMovies({ withGenres: "28", sortBy: "vote_average.desc", voteCountGte: 500 })
+    discoverMovies({ withGenres: "28", sortBy: "vote_average.desc", voteCountGte: 500, page: randomPage() })
       .then((data) => setAction(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setActionLoading(false));
 
     // Horror (genre 27)
     setHorrorLoading(true);
-    discoverMovies({ withGenres: "27", sortBy: "vote_average.desc", voteCountGte: 300 })
+    discoverMovies({ withGenres: "27", sortBy: "vote_average.desc", voteCountGte: 300, page: randomPage() })
       .then((data) => setHorror(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setHorrorLoading(false));
 
     // Sci-Fi (genre 878)
     setScifiLoading(true);
-    discoverMovies({ withGenres: "878", sortBy: "vote_average.desc", voteCountGte: 300 })
+    discoverMovies({ withGenres: "878", sortBy: "vote_average.desc", voteCountGte: 300, page: randomPage() })
       .then((data) => setScifi(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setScifiLoading(false));
 
     // Drama (genre 18)
     setDramaLoading(true);
-    discoverMovies({ withGenres: "18", sortBy: "vote_average.desc", voteCountGte: 1000 })
+    discoverMovies({ withGenres: "18", sortBy: "vote_average.desc", voteCountGte: 1000, page: randomPage() })
       .then((data) => setDrama(Array.isArray(data) ? data : data.results || []))
       .catch(() => {})
       .finally(() => setDramaLoading(false));
@@ -263,8 +278,10 @@ export default function Home() {
       debounceRef.current = setTimeout(async () => {
         setLoading(true);
         try {
-          const data = await searchMovies(value.trim(), country);
+          const data = await searchMovies(value.trim(), country, 1);
           setResults(data.results || []);
+          setSearchPage(1);
+          setSearchTotalPages(data.total_pages || 1);
           saveToHistory(value.trim());
           setSearchHistory(getSearchHistory());
         } catch {
@@ -277,52 +294,96 @@ export default function Home() {
     [country]
   );
 
+  // Load more search results
+  const loadMoreResults = useCallback(async () => {
+    if (loadingMore || searchPage >= searchTotalPages) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = searchPage + 1;
+      const data = await searchMovies(query.trim(), country, nextPage);
+      setResults((prev) => [...prev, ...(data.results || [])]);
+      setSearchPage(nextPage);
+      setSearchTotalPages(data.total_pages || 1);
+    } catch {}
+    setLoadingMore(false);
+  }, [loadingMore, searchPage, searchTotalPages, query, country]);
+
+  // Build filter params helper
+  const buildFilterParams = useCallback(() => {
+    const decade = DECADES[filterDecade];
+    const sortByMap = {
+      popularity: "popularity.desc",
+      rating: "vote_average.desc",
+      date_desc: "primary_release_date.desc",
+      date_asc: "primary_release_date.asc",
+    };
+    const params = {
+      sortBy: sortByMap[filterSort] || "popularity.desc",
+      voteCountGte: filterSort === "rating" ? 200 : 100,
+    };
+    if (filterGenre) params.withGenres = filterGenre;
+    if (filterMinRating > 0) params.voteAverageGte = filterMinRating;
+    if (filterProviders.length > 0) {
+      params.withWatchProviders = filterProviders.join("|");
+      params.watchRegion = country;
+    }
+    return { params, decade };
+  }, [filterGenre, filterDecade, filterMinRating, filterProviders, filterSort, country]);
+
+  const processFilterItems = useCallback((items, decade) => {
+    if (decade.from) {
+      items = items.filter((m) => {
+        const yr = parseInt(m.year);
+        return yr >= parseInt(decade.from) && yr <= parseInt(decade.to);
+      });
+    }
+    if (filterSort === "rating") {
+      items.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+    } else if (filterSort === "date_desc") {
+      items.sort((a, b) => (b.release_date || "").localeCompare(a.release_date || ""));
+    } else if (filterSort === "date_asc") {
+      items.sort((a, b) => (a.release_date || "").localeCompare(b.release_date || ""));
+    }
+    return items;
+  }, [filterSort]);
+
   // Filter search
   const applyFilters = useCallback(async () => {
     setFilterLoading(true);
     setIsFilterActive(true);
+    setFilterPage(1);
     try {
-      const decade = DECADES[filterDecade];
-      const sortByMap = {
-        popularity: "popularity.desc",
-        rating: "vote_average.desc",
-        date_desc: "primary_release_date.desc",
-        date_asc: "primary_release_date.asc",
-      };
-      const params = {
-        sortBy: sortByMap[filterSort] || "popularity.desc",
-        voteCountGte: filterSort === "rating" ? 200 : 100,
-      };
-      if (filterGenre) params.withGenres = filterGenre;
-      if (filterMinRating > 0) params.voteAverageGte = filterMinRating;
-      if (filterProviders.length > 0) {
-        params.withWatchProviders = filterProviders.join("|");
-        params.watchRegion = country;
-      }
+      const { params, decade } = buildFilterParams();
+      params.page = 1;
       const data = await discoverMovies(params);
-      let items = Array.isArray(data) ? data : data.results || [];
-      // Client-side year filtering since TMDB discover doesn't have year range
-      if (decade.from) {
-        items = items.filter((m) => {
-          const yr = parseInt(m.year);
-          return yr >= parseInt(decade.from) && yr <= parseInt(decade.to);
-        });
-      }
-      // Client-side sort for rating/date (in case TMDB sort differs)
-      if (filterSort === "rating") {
-        items.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
-      } else if (filterSort === "date_desc") {
-        items.sort((a, b) => (b.release_date || "").localeCompare(a.release_date || ""));
-      } else if (filterSort === "date_asc") {
-        items.sort((a, b) => (a.release_date || "").localeCompare(b.release_date || ""));
-      }
+      const rawItems = Array.isArray(data) ? data : data.results || [];
+      const items = processFilterItems([...rawItems], decade);
       setFilterResults(items);
+      setFilterTotalPages(data.total_pages || 1);
     } catch {
       setFilterResults([]);
     } finally {
       setFilterLoading(false);
     }
-  }, [filterGenre, filterDecade, filterMinRating, filterProviders, filterSort]);
+  }, [buildFilterParams, processFilterItems]);
+
+  // Load more filter results
+  const loadMoreFilters = useCallback(async () => {
+    if (filterLoadingMore || filterPage >= filterTotalPages) return;
+    setFilterLoadingMore(true);
+    try {
+      const nextPage = filterPage + 1;
+      const { params, decade } = buildFilterParams();
+      params.page = nextPage;
+      const data = await discoverMovies(params);
+      const rawItems = Array.isArray(data) ? data : data.results || [];
+      const items = processFilterItems([...rawItems], decade);
+      setFilterResults((prev) => [...prev, ...items]);
+      setFilterPage(nextPage);
+      setFilterTotalPages(data.total_pages || 1);
+    } catch {}
+    setFilterLoadingMore(false);
+  }, [filterLoadingMore, filterPage, filterTotalPages, buildFilterParams, processFilterItems]);
 
   const clearFilters = () => {
     setFilterGenre("");
@@ -332,6 +393,8 @@ export default function Home() {
     setFilterSort("popularity");
     setIsFilterActive(false);
     setFilterResults([]);
+    setFilterPage(1);
+    setFilterTotalPages(1);
     setShowFilters(false);
   };
 
@@ -344,6 +407,8 @@ export default function Home() {
   const clearSearch = () => {
     setQuery("");
     setResults([]);
+    setSearchPage(1);
+    setSearchTotalPages(1);
   };
 
   const showResults = query.trim().length > 0;
@@ -597,11 +662,33 @@ export default function Home() {
                 ))}
               </div>
             ) : results.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {results.map((m) => (
-                  <MovieCard key={m.tmdb_id} movie={m} size="full" />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {results.map((m) => (
+                    <MovieCard key={m.tmdb_id} movie={m} size="full" />
+                  ))}
+                </div>
+                {searchPage < searchTotalPages && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={loadMoreResults}
+                      disabled={loadingMore}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-cine-card text-white rounded-xl text-sm font-semibold ring-1 ring-cine-border hover:ring-cine-accent hover:text-cine-accent transition disabled:opacity-50"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-cine-accent border-t-transparent rounded-full animate-spin" />
+                          Cargando…
+                        </>
+                      ) : (
+                        <>
+                          Cargar más <ChevronRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-cine-muted text-center py-12">
                 No se encontraron resultados
@@ -630,11 +717,33 @@ export default function Home() {
                 ))}
               </div>
             ) : filterResults.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {filterResults.map((m) => (
-                  <MovieCard key={m.tmdb_id} movie={m} size="full" />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {filterResults.map((m) => (
+                    <MovieCard key={m.tmdb_id} movie={m} size="full" />
+                  ))}
+                </div>
+                {filterPage < filterTotalPages && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={loadMoreFilters}
+                      disabled={filterLoadingMore}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-cine-card text-white rounded-xl text-sm font-semibold ring-1 ring-cine-border hover:ring-cine-accent hover:text-cine-accent transition disabled:opacity-50"
+                    >
+                      {filterLoadingMore ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-cine-accent border-t-transparent rounded-full animate-spin" />
+                          Cargando…
+                        </>
+                      ) : (
+                        <>
+                          Cargar más <ChevronRight className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-cine-muted text-center py-12">
                 No se encontraron películas con esos filtros

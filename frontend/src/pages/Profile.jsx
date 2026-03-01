@@ -16,6 +16,10 @@ import {
   UserPlus,
   UserMinus,
   Users,
+  Settings,
+  Palette,
+  PenLine,
+  Film,
 } from "lucide-react";
 import {
   getProfile,
@@ -40,6 +44,36 @@ function imgUrl(path, size = "w92") {
   if (!path) return null;
   if (path.startsWith("http")) return path;
   return `${TMDB_IMG}/${size}${path}`;
+}
+
+const AVATAR_COLORS = [
+  { name: "Rojo", value: "bg-red-600", ring: "ring-red-500" },
+  { name: "Azul", value: "bg-blue-600", ring: "ring-blue-500" },
+  { name: "Verde", value: "bg-emerald-600", ring: "ring-emerald-500" },
+  { name: "Morado", value: "bg-purple-600", ring: "ring-purple-500" },
+  { name: "Rosa", value: "bg-pink-600", ring: "ring-pink-500" },
+  { name: "Naranja", value: "bg-orange-600", ring: "ring-orange-500" },
+  { name: "Amarillo", value: "bg-yellow-500", ring: "ring-yellow-400" },
+  { name: "Cyan", value: "bg-cyan-600", ring: "ring-cyan-500" },
+  { name: "Índigo", value: "bg-indigo-600", ring: "ring-indigo-500" },
+  { name: "Default", value: "bg-cine-card", ring: "ring-cine-border" },
+];
+
+const PROFILE_STORAGE_KEY = "txilms-profile-settings";
+
+function getProfileSettings(userId) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || "{}");
+    return all[userId] || {};
+  } catch { return {}; }
+}
+
+function saveProfileSettings(userId, settings) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEY) || "{}");
+    all[userId] = { ...(all[userId] || {}), ...settings };
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(all));
+  } catch {}
 }
 
 const LIST_TABS = [
@@ -89,6 +123,25 @@ export default function Profile() {
   const [followCounts, setFollowCounts] = useState({ following: 0, followers: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
+
+  // Profile customization
+  const [showSettings, setShowSettings] = useState(false);
+  const [profileSettings, setProfileSettings] = useState({});
+  const [bio, setBio] = useState("");
+  const [avatarColor, setAvatarColor] = useState("bg-cine-card");
+  const [favGenre, setFavGenre] = useState("");
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Load profile settings
+  useEffect(() => {
+    if (targetId) {
+      const settings = getProfileSettings(targetId);
+      setProfileSettings(settings);
+      setBio(settings.bio || "");
+      setAvatarColor(settings.avatarColor || "bg-cine-card");
+      setFavGenre(settings.favGenre || "");
+    }
+  }, [targetId]);
 
   useEffect(() => {
     if (!targetId) return;
@@ -240,10 +293,20 @@ export default function Profile() {
       <section className="px-4 pt-6 md:pt-10 pb-4">
         <div className="max-w-4xl mx-auto text-center">
           {/* avatar */}
-          <div className="w-20 h-20 rounded-full bg-cine-card ring-2 ring-cine-border mx-auto flex items-center justify-center text-2xl font-bold uppercase text-cine-accent">
+          <div className={`w-20 h-20 rounded-full ${avatarColor} ring-2 ring-cine-border mx-auto flex items-center justify-center text-2xl font-bold uppercase text-white`}>
             {profile.username?.charAt(0) || "?"}
           </div>
           <h1 className="text-xl font-extrabold mt-3">{profile.username}</h1>
+          {/* Bio */}
+          {bio && (
+            <p className="text-xs text-cine-muted mt-1 italic max-w-xs mx-auto">"{bio}"</p>
+          )}
+          {/* Favorite genre badge */}
+          {favGenre && (
+            <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 bg-cine-card rounded-full text-[11px] text-cine-accent ring-1 ring-cine-border">
+              <Film className="w-3 h-3" /> {favGenre}
+            </span>
+          )}
           <div className="flex items-center justify-center gap-2 mt-1">
             {profile.is_admin && (
               <span className="flex items-center gap-1 text-xs text-cine-gold">
@@ -324,6 +387,12 @@ export default function Profile() {
                 <Lock className="w-3.5 h-3.5" /> Cambiar contraseña
               </button>
               <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
+              >
+                <Settings className="w-3.5 h-3.5" /> Personalizar
+              </button>
+              <button
                 onClick={() => setShowStats(!showStats)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-cine-muted hover:text-cine-accent ring-1 ring-cine-border hover:ring-cine-accent transition"
               >
@@ -386,6 +455,95 @@ export default function Profile() {
                 {pwLoading ? "Cambiando…" : "Cambiar contraseña"}
               </button>
             </form>
+          </div>
+        </section>
+      )}
+
+      {/* Profile customization */}
+      {isMe && showSettings && (
+        <section className="max-w-md mx-auto px-4 mb-4 animate-fadeInUp">
+          <div className="bg-cine-card rounded-xl ring-1 ring-cine-border p-4">
+            <h3 className="text-sm font-bold mb-4 flex items-center gap-1.5">
+              <Settings className="w-4 h-4 text-cine-accent" /> Personalizar perfil
+            </h3>
+
+            {/* Avatar color */}
+            <div className="mb-4">
+              <label className="text-[11px] text-cine-muted block mb-2 flex items-center gap-1">
+                <Palette className="w-3 h-3" /> Color del avatar
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {AVATAR_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setAvatarColor(c.value)}
+                    className={`w-8 h-8 rounded-full ${c.value} ring-2 transition ${
+                      avatarColor === c.value ? `${c.ring} scale-110` : "ring-transparent hover:ring-white/30"
+                    } flex items-center justify-center text-white text-xs font-bold`}
+                    title={c.name}
+                  >
+                    {avatarColor === c.value && <Check className="w-4 h-4" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Bio */}
+            <div className="mb-4">
+              <label className="text-[11px] text-cine-muted block mb-1.5 flex items-center gap-1">
+                <PenLine className="w-3 h-3" /> Bio / Descripción
+              </label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value.slice(0, 150))}
+                placeholder="Escribe algo sobre ti... (máx. 150 chars)"
+                className="w-full bg-cine-bg rounded-lg px-3 py-2 text-xs text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none resize-none h-16 placeholder:text-cine-muted/60"
+              />
+              <p className="text-[10px] text-cine-muted text-right mt-0.5">{bio.length}/150</p>
+            </div>
+
+            {/* Favorite genre */}
+            <div className="mb-4">
+              <label className="text-[11px] text-cine-muted block mb-1.5 flex items-center gap-1">
+                <Film className="w-3 h-3" /> Género favorito (se muestra en tu perfil)
+              </label>
+              <select
+                value={favGenre}
+                onChange={(e) => setFavGenre(e.target.value)}
+                className="w-full bg-cine-bg rounded-lg px-3 py-2 text-sm text-white ring-1 ring-cine-border focus:ring-cine-accent outline-none"
+              >
+                <option value="">Sin especificar</option>
+                <option value="Acción">Acción</option>
+                <option value="Animación">Animación</option>
+                <option value="Aventura">Aventura</option>
+                <option value="Comedia">Comedia</option>
+                <option value="Crimen">Crimen</option>
+                <option value="Documental">Documental</option>
+                <option value="Drama">Drama</option>
+                <option value="Fantasía">Fantasía</option>
+                <option value="Romance">Romance</option>
+                <option value="Sci-Fi">Sci-Fi</option>
+                <option value="Suspense">Suspense</option>
+                <option value="Terror">Terror</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => {
+                saveProfileSettings(targetId, { bio, avatarColor, favGenre });
+                setSettingsSaved(true);
+                setTimeout(() => setSettingsSaved(false), 2000);
+              }}
+              className="w-full py-2 bg-cine-accent text-white rounded-lg text-sm font-semibold hover:bg-cine-accent/90 transition flex items-center justify-center gap-1.5"
+            >
+              {settingsSaved ? (
+                <>
+                  <Check className="w-4 h-4" /> ¡Guardado!
+                </>
+              ) : (
+                "Guardar cambios"
+              )}
+            </button>
           </div>
         </section>
       )}
