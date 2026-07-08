@@ -1,0 +1,668 @@
+import { useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Heart,
+  Bookmark,
+  Eye,
+  ExternalLink,
+  Clock,
+  Calendar,
+  Film,
+  Send,
+  Star,
+  Play,
+  Pencil,
+  ListPlus,
+  Check,
+} from "lucide-react";
+import { getMovieDetail, getMovieRatings, getRecommendations, getCustomLists, addToCustomList, predictRating } from "../api/api";
+import useColorExtractor from "../hooks/useColorExtractor";
+import ScoreCard from "../components/ScoreCard";
+import ShareModal from "../components/ShareModal";
+import RatingModal from "../components/RatingModal";
+import useStore from "../store/useStore";
+
+const TMDB_IMG = "https://image.tmdb.org/t/p";
+
+function imgUrl(path, size = "w500") {
+  if (!path) return null;
+  // Backend may return full URL or just a path
+  if (path.startsWith("http")) return path;
+  return `${TMDB_IMG}/${size}${path}`;
+}
+
+export default function Details() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [movie, setMovie] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [showShare, setShowShare] = useState(false);
+  const [showRating, setShowRating] = useState(false);
+  const [friendRatings, setFriendRatings] = useState([]);
+  const [similarMovies, setSimilarMovies] = useState([]);
+  const [activeTrailer, setActiveTrailer] = useState(null);
+  const [customLists, setCustomLists] = useState([]);
+  const [showCustomListMenu, setShowCustomListMenu] = useState(false);
+  const [addedToList, setAddedToList] = useState(null);
+  const [prediction, setPrediction] = useState(null);
+
+  const {
+    country,
+    isFavorite,
+    toggleFavorite,
+    isInWatchlist,
+    toggleWatchlist,
+    isWatched,
+    addToWatched,
+    removeFromWatched,
+    getWatchedRating,
+    fetchLists,
+    listsLoaded,
+  } = useStore();
+
+  const posterUrl = imgUrl(movie?.poster, "w500");
+  const backdropUrl = imgUrl(movie?.backdrop, "w1280");
+
+  const dominantColor = useColorExtractor(posterUrl);
+
+  useEffect(() => {
+    if (!listsLoaded) fetchLists();
+    getCustomLists().then(setCustomLists).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    setActiveTrailer(null);
+    setSimilarMovies([]);
+    getMovieDetail(id, country)
+      .then(setMovie)
+      .catch(() => setError("No se pudo cargar la película"))
+      .finally(() => setLoading(false));
+
+    // Load friend ratings
+    getMovieRatings(id).then(setFriendRatings).catch(() => {});
+
+    // Load rating prediction
+    predictRating(id).then(setPrediction).catch(() => setPrediction(null));
+
+    // Load similar movies
+    getRecommendations(id).then((data) => setSimilarMovies(data?.slice(0, 12) || [])).catch(() => {});
+  }, [id, country]);
+
+  /* ───── loading skeleton ───── */
+  if (loading) {
+    return (
+      <div className="min-h-screen pb-24 md:pb-8">
+        <div className="h-[340px] md:h-[420px] skeleton" />
+        <div className="max-w-4xl mx-auto px-4 -mt-32 relative z-10 space-y-4">
+          <div className="flex gap-4">
+            <div className="w-36 md:w-48 aspect-[2/3] rounded-xl skeleton flex-shrink-0" />
+            <div className="flex-1 space-y-3 pt-4">
+              <div className="h-7 w-3/4 skeleton rounded" />
+              <div className="h-4 w-1/2 skeleton rounded" />
+              <div className="h-4 w-1/3 skeleton rounded" />
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 skeleton rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !movie) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <p className="text-cine-muted text-lg">{error || "Película no encontrada"}</p>
+        <button onClick={() => navigate(-1)} className="text-cine-accent hover:underline flex items-center gap-1">
+          <ArrowLeft className="w-4 h-4" /> Volver
+        </button>
+      </div>
+    );
+  }
+
+  const scores = movie.scores || {};
+  const providers = movie.watch_providers || {};
+
+  const miniMovie = {
+    tmdb_id: movie.tmdb_id,
+    title: movie.title,
+    poster: movie.poster,
+    year: movie.year,
+    vote_average: scores.imdb?.score || null,
+  };
+
+  return (
+    <div className="min-h-screen pb-24 md:pb-8 overflow-x-hidden">
+      {/* ───── backdrop hero ───── */}
+      <div className="relative h-[340px] md:h-[420px] overflow-hidden">
+        {backdropUrl && (
+          <img
+            src={backdropUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        {/* gradient overlays */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(to bottom, ${dominantColor} 0%, rgba(10,10,15,0.7) 50%, #0a0a0f 100%)`,
+          }}
+        />
+        {/* back button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="absolute top-4 left-4 md:top-6 md:left-6 z-20 flex items-center gap-1.5 text-sm text-white/80 hover:text-white bg-black/40 backdrop-blur rounded-full px-3 py-1.5 transition"
+        >
+          <ArrowLeft className="w-4 h-4" /> Volver
+        </button>
+      </div>
+
+      {/* ───── main content ───── */}
+      <div className="max-w-4xl mx-auto px-4 -mt-36 md:-mt-44 relative z-10">
+        {/* poster + meta row */}
+        <div className="flex gap-4 md:gap-6">
+          {/* poster */}
+          <div className="flex-shrink-0 w-32 md:w-48">
+            {posterUrl ? (
+              <img
+                src={posterUrl}
+                alt={movie.title}
+                className="w-full rounded-xl shadow-2xl ring-1 ring-white/10"
+              />
+            ) : (
+              <div className="w-full aspect-[2/3] rounded-xl bg-cine-card flex items-center justify-center text-cine-muted">
+                <Film className="w-10 h-10" />
+              </div>
+            )}
+          </div>
+
+          {/* title + metadata */}
+          <div className="flex-1 pt-2 md:pt-6 min-w-0">
+            <h1 className="text-xl md:text-3xl font-extrabold leading-tight line-clamp-3">
+              {movie.title}
+            </h1>
+            {movie.original_title && movie.original_title !== movie.title && (
+              <p className="text-cine-muted text-xs md:text-sm mt-0.5 italic line-clamp-1">
+                {movie.original_title}
+              </p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-xs md:text-sm text-cine-muted">
+              {movie.year && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" /> {movie.year}
+                </span>
+              )}
+              {movie.runtime > 0 && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" /> {movie.runtime} min
+                </span>
+              )}
+              {movie.rated && movie.rated !== "N/A" && (
+                <span className="px-1.5 py-0.5 rounded bg-cine-card ring-1 ring-cine-border text-[11px] font-semibold">
+                  {movie.rated}
+                </span>
+              )}
+            </div>
+
+            {/* genres */}
+            {movie.genres?.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {movie.genres.map((g) => (
+                  <span
+                    key={g}
+                    className="px-2 py-0.5 bg-cine-card rounded-full text-[11px] text-cine-muted ring-1 ring-cine-border"
+                  >
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {movie.director && (
+              <p className="text-xs text-cine-muted mt-2">
+                Dirección: <span className="text-white font-medium">{movie.director}</span>
+              </p>
+            )}
+
+            {/* action buttons */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              <ActionBtn
+                active={isFavorite(movie.tmdb_id)}
+                onClick={() => toggleFavorite(miniMovie)}
+                Icon={Heart}
+                label="Favorita"
+                activeColor="text-cine-accent"
+              />
+              <ActionBtn
+                active={isInWatchlist(movie.tmdb_id)}
+                onClick={() => toggleWatchlist(miniMovie)}
+                Icon={Bookmark}
+                label="Pendiente"
+                activeColor="text-cine-gold"
+              />
+              <ActionBtn
+                active={isWatched(movie.tmdb_id)}
+                onClick={() => {
+                  if (isWatched(movie.tmdb_id)) {
+                    removeFromWatched(movie.tmdb_id);
+                  } else {
+                    setShowRating(true);
+                  }
+                }}
+                Icon={Eye}
+                label="Vista"
+                activeColor="text-cine-green"
+              />
+              <ActionBtn
+                active={false}
+                onClick={() => setShowShare(true)}
+                Icon={Send}
+                label="Enviar"
+                activeColor="text-cine-blue"
+              />
+              {isWatched(movie.tmdb_id) && (
+                <ActionBtn
+                  active={true}
+                  onClick={() => setShowRating(true)}
+                  Icon={Pencil}
+                  label={`Re-puntuar (${getWatchedRating(movie.tmdb_id)?.toFixed?.(1) || getWatchedRating(movie.tmdb_id) || "?"})`}
+                  activeColor="text-cine-gold"
+                />
+              )}
+              {/* Add to custom list */}
+              {customLists.length > 0 && (
+                <div className="relative">
+                  <ActionBtn
+                    active={!!addedToList}
+                    onClick={() => setShowCustomListMenu(!showCustomListMenu)}
+                    Icon={addedToList ? Check : ListPlus}
+                    label={addedToList || "Añadir a lista"}
+                    activeColor="text-cine-green"
+                  />
+                  {showCustomListMenu && (
+                    <div className="absolute top-full left-0 mt-1 w-48 bg-cine-card rounded-xl ring-1 ring-cine-border shadow-xl overflow-hidden z-50 animate-fadeInUp">
+                      {customLists.map((cl) => (
+                        <button
+                          key={cl.id}
+                          onClick={async () => {
+                            try {
+                              await addToCustomList(cl.id, {
+                                tmdb_id: movie.tmdb_id,
+                                movie_title: movie.title,
+                                movie_poster: movie.poster,
+                                movie_year: movie.year,
+                              });
+                              setAddedToList(cl.name);
+                              setTimeout(() => setAddedToList(null), 2000);
+                            } catch {}
+                            setShowCustomListMenu(false);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm hover:bg-cine-border/40 transition text-white"
+                        >
+                          {cl.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ───── scores ───── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 overflow-hidden">
+          <ScoreCard
+            emoji="🎬"
+            label="FilmAffinity"
+            value={scores.filmaffinity?.score}
+            subtitle={
+              scores.filmaffinity?.votes
+                ? `${scores.filmaffinity.votes} votos`
+                : null
+            }
+            color="text-cine-blue"
+          />
+          <ScoreCard
+            emoji="⭐"
+            label="IMDb"
+            value={scores.imdb?.score}
+            subtitle={scores.imdb?.votes ? `${scores.imdb.votes} votos` : null}
+            color="text-cine-gold"
+          />
+          <ScoreCard
+            emoji="🍅"
+            label="Rotten Tomatoes"
+            value={scores.rotten_tomatoes?.score != null ? `${scores.rotten_tomatoes.score}%` : null}
+            color={
+              scores.rotten_tomatoes?.score >= 60
+                ? "text-cine-green"
+                : "text-cine-accent"
+            }
+          />
+          <ScoreCard
+            emoji="Ⓜ️"
+            label="Metascore"
+            value={scores.metascore && scores.metascore !== "N/A" ? scores.metascore : null}
+            color={
+              scores.metascore >= 61
+                ? "text-cine-green"
+                : scores.metascore >= 40
+                ? "text-cine-gold"
+                : "text-cine-accent"
+            }
+          />
+        </div>
+
+        {/* FilmAffinity link */}
+        {scores.filmaffinity?.url && (
+          <a
+            href={scores.filmaffinity.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 mt-2 text-xs text-cine-blue hover:underline"
+          >
+            Ver en FilmAffinity <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
+
+        {/* ───── sinopsis ───── */}
+        {movie.overview && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-2">Sinopsis</h2>
+            <p className="text-sm text-cine-muted leading-relaxed">
+              {movie.overview}
+            </p>
+          </section>
+        )}
+
+        {/* ───── streaming providers ───── */}
+        {(providers.flatrate?.length > 0 ||
+          providers.rent?.length > 0 ||
+          providers.buy?.length > 0) && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3">Dónde ver</h2>
+            <div className="space-y-3">
+              <ProviderRow label="Suscripción" items={providers.flatrate} />
+              <ProviderRow label="Alquiler" items={providers.rent} />
+              <ProviderRow label="Compra" items={providers.buy} />
+            </div>
+            {providers.link && (
+              <a
+                href={providers.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 mt-2 text-xs text-cine-blue hover:underline"
+              >
+                Ver todas las opciones en TMDB{" "}
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </section>
+        )}
+
+        {/* ───── cast ───── */}
+        {movie.cast?.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3">Reparto</h2>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              {movie.cast.slice(0, 15).map((c) => (
+                <div
+                  key={c.name}
+                  className="flex-shrink-0 w-20 text-center"
+                >
+                  {c.profile_image ? (
+                    <img
+                      src={imgUrl(c.profile_image, "w185")}
+                      alt={c.name}
+                      className="w-16 h-16 rounded-full mx-auto object-cover ring-1 ring-cine-border"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full mx-auto bg-cine-card ring-1 ring-cine-border flex items-center justify-center text-cine-muted text-lg">
+                      🎭
+                    </div>
+                  )}
+                  <p className="text-[11px] font-semibold mt-1 line-clamp-2 leading-tight">
+                    {c.name}
+                  </p>
+                  {c.character && (
+                    <p className="text-[10px] text-cine-muted line-clamp-1">
+                      {c.character}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ───── friend ratings & reviews ───── */}
+        {friendRatings.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3 flex items-center gap-2">
+              <Star className="w-4 h-4 text-cine-gold" /> Puntuaciones de amigos
+            </h2>
+            <div className="space-y-2">
+              {friendRatings.map((r, i) => (
+                <Link
+                  key={i}
+                  to={`/profile/${r.user_id}`}
+                  className="flex items-start gap-2.5 bg-cine-card rounded-xl px-3 py-2.5 ring-1 ring-cine-border hover:ring-cine-accent/30 transition"
+                >
+                  <div className="w-7 h-7 rounded-full bg-cine-border flex items-center justify-center text-[10px] font-bold uppercase text-cine-accent flex-shrink-0 mt-0.5">
+                    {r.username?.charAt(0) || "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{r.username}</span>
+                      <span className="text-cine-gold text-sm font-bold">
+                        {typeof r.rating === 'number' ? r.rating.toFixed(1) : r.rating}/10
+                      </span>
+                    </div>
+                    {r.review && (
+                      <p className="text-xs text-cine-muted mt-0.5 line-clamp-2 italic">
+                        "{r.review}"
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ───── rating prediction ───── */}
+        {prediction && prediction.predicted_rating && !prediction.already_rated && (
+          <section className="mt-6">
+            <div className="bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/20 rounded-2xl p-4">
+              <h2 className="text-sm font-bold mb-2 flex items-center gap-2">
+                🔮 Predicción para ti
+              </h2>
+              <div className="flex items-center gap-4">
+                <div className="text-3xl font-black text-cine-accent">
+                  {prediction.predicted_rating}
+                  <span className="text-base text-cine-muted font-normal">/10</span>
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs text-cine-muted">
+                    Confianza: {prediction.confidence}%
+                  </div>
+                  <div className="h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden">
+                    <div
+                      className="h-full bg-purple-400 rounded-full transition-all"
+                      style={{ width: `${prediction.confidence}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-cine-muted/60 mt-1">
+                    Basada en {prediction.based_on} usuario{prediction.based_on !== 1 ? "s" : ""} con gustos similares
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ───── tráilers ───── */}
+        {movie.videos?.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3 flex items-center gap-2">
+              <Play className="w-4 h-4 text-cine-accent" /> Tráilers y vídeos
+            </h2>
+            {activeTrailer ? (
+              <div className="relative w-full aspect-video rounded-xl overflow-hidden ring-1 ring-cine-border">
+                <iframe
+                  src={`https://www.youtube.com/embed/${activeTrailer}?autoplay=1&rel=0`}
+                  title="Trailer"
+                  className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            ) : null}
+            <div className="flex gap-3 overflow-x-auto no-scrollbar mt-3 pb-2">
+              {movie.videos.map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setActiveTrailer(v.key)}
+                  className={`flex-shrink-0 relative w-48 aspect-video rounded-lg overflow-hidden ring-1 transition group ${
+                    activeTrailer === v.key ? "ring-cine-accent" : "ring-cine-border hover:ring-white/30"
+                  }`}
+                >
+                  <img
+                    src={`https://img.youtube.com/vi/${v.key}/mqdefault.jpg`}
+                    alt={v.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center group-hover:bg-black/20 transition">
+                    <Play className="w-8 h-8 text-white fill-white/80" />
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1">
+                    <p className="text-[10px] text-white line-clamp-1">{v.name}</p>
+                    <p className="text-[9px] text-white/60">{v.type}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ───── películas similares ───── */}
+        {similarMovies.length > 0 && (
+          <section className="mt-6">
+            <h2 className="text-base font-bold mb-3">Películas similares</h2>
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+              {similarMovies.map((sm) => (
+                <Link
+                  key={sm.tmdb_id}
+                  to={`/movie/${sm.tmdb_id}`}
+                  className="flex-shrink-0 w-28 group"
+                >
+                  {sm.poster ? (
+                    <img
+                      src={imgUrl(sm.poster, "w185")}
+                      alt={sm.title}
+                      className="w-full aspect-[2/3] rounded-lg object-cover ring-1 ring-cine-border group-hover:ring-cine-accent/50 transition"
+                    />
+                  ) : (
+                    <div className="w-full aspect-[2/3] rounded-lg bg-cine-card ring-1 ring-cine-border flex items-center justify-center text-cine-muted">
+                      <Film className="w-6 h-6" />
+                    </div>
+                  )}
+                  <p className="text-[11px] font-medium mt-1 line-clamp-2 leading-tight group-hover:text-cine-accent transition">
+                    {sm.title}
+                  </p>
+                  {sm.year && <p className="text-[10px] text-cine-muted">{sm.year}</p>}
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {/* ───── Modals ───── */}
+      {showShare && movie && (
+        <ShareModal movie={miniMovie} onClose={() => setShowShare(false)} />
+      )}
+      {showRating && movie && (
+        <RatingModal
+          movie={miniMovie}
+          initialRating={getWatchedRating(movie.tmdb_id)}
+          onClose={() => setShowRating(false)}
+          onConfirm={(rating, review) => {
+            // Build genre_ids string from movie genres
+            const genreMap = {
+              "Acción": "28", "Animación": "16", "Aventura": "12", "Comedia": "35",
+              "Crimen": "80", "Documental": "99", "Drama": "18", "Fantasía": "14",
+              "Terror": "27", "Romance": "10749", "Sci-Fi": "878", "Suspense": "53",
+              "Ciencia ficción": "878", "Thriller": "53",
+            };
+            const genreIds = (movie.genres || [])
+              .map((g) => genreMap[g] || "")
+              .filter(Boolean)
+              .join(",");
+
+            if (isWatched(movie.tmdb_id)) {
+              useStore.getState().reRate(movie.tmdb_id, rating, review);
+            } else {
+              addToWatched(miniMovie, rating, review, genreIds || null);
+            }
+            setShowRating(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ───── tiny sub-components ───── */
+
+function ActionBtn({ active, onClick, Icon, label, activeColor }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition ring-1 ${
+        active
+          ? `${activeColor} bg-white/5 ring-current`
+          : "text-cine-muted ring-cine-border hover:ring-white/30 hover:text-white"
+      }`}
+    >
+      <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" fill={active ? "currentColor" : "none"} />
+      {label}
+    </button>
+  );
+}
+
+function ProviderRow({ label, items }) {
+  if (!items?.length) return null;
+  return (
+    <div>
+      <p className="text-xs text-cine-muted mb-1.5">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {items.map((p) => (
+          <div
+            key={p.provider_name}
+            className="flex items-center gap-2 bg-cine-card rounded-lg px-2.5 py-1.5 ring-1 ring-cine-border"
+          >
+            {p.logo && (
+              <img
+                src={imgUrl(p.logo, "w45")}
+                alt={p.provider_name}
+                className="w-6 h-6 rounded"
+              />
+            )}
+            <span className="text-xs">{p.provider_name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
